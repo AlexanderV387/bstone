@@ -12,6 +12,7 @@ SPDX-License-Identifier: MIT
 
 #include <cstdio>
 #include <cstdlib>
+#include <exception>
 
 #include <3ds.h>
 
@@ -19,6 +20,12 @@ SPDX-License-Identifier: MIT
 #include "SDL.h"
 
 #include "id_in.h"
+
+// libctru's main thread stack is 32 KiB by default: too small for BStone.
+extern "C"
+{
+	u32 __stacksize__ = 1024 * 1024;
+}
 
 namespace bstone {
 namespace n3ds {
@@ -114,10 +121,38 @@ constexpr auto c_stick_max = 146;
 
 } // namespace
 
+// An exception that nothing caught (e.g. before the game's own error
+// handling is set up): show it instead of closing silently.
+[[noreturn]] void on_terminate()
+{
+	auto message = "Unknown error.";
+
+	try
+	{
+		const auto exception = std::current_exception();
+
+		if (exception != nullptr)
+		{
+			std::rethrow_exception(exception);
+		}
+	}
+	catch (const std::exception& exception)
+	{
+		message = exception.what();
+	}
+	catch (...)
+	{
+	}
+
+	show_error(message);
+	std::_Exit(1);
+}
+
 void initialize()
 {
 	osSetSpeedupEnable(true);
 	SDL_SetMainReady();
+	std::set_terminate(on_terminate);
 }
 
 void show_error(const char* message)
