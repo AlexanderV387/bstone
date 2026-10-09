@@ -1487,8 +1487,15 @@ void CalcTics()
 	period_counter += diff_ns * TickBase;
 	const long long elapsed_periods = period_counter / one_second_ns;
 	period_counter %= one_second_ns;
+#ifndef __3DS__
 	const std::chrono::nanoseconds delay{(one_second_ns - period_counter) / TickBase};
 	std::this_thread::sleep_for(delay);
+#else
+	// On the 3DS every frame already waits for the 60 Hz vertical blank.
+	// Sleeping until the next 70 Hz tic as well made the two waits drift
+	// apart, and most frames missed a vblank: ~40 FPS with ~7 ms of work.
+	// The tics still come from the elapsed time (1 or 2 per frame).
+#endif
 	constexpr long long min_tics = 1;
 	constexpr long long max_tics = UINT16_MAX;
 	tics = static_cast<std::uint16_t>(bstone::clamp(elapsed_periods, min_tics, max_tics));
