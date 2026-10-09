@@ -435,6 +435,12 @@ const FoundContent* choose_content(
 
 	bstone::globals::logger->log_information("Found multiple contents.");
 
+#ifdef __3DS__
+	// No message boxes on the 3DS; the game picker (bstone_n3ds.cpp) passes
+	// --aog, --aog_sw or --ps, so this is only a fallback.
+	return found_contents.data();
+#endif
+
 	using Button = bstone::sys::MessageBoxButton;
 	using LocalButtons = std::vector<Button>;
 

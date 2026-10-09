@@ -9984,6 +9984,13 @@ int main(
 	// with a message box).
 	std::vector<char*> n3ds_args(argv, argv + argc);
 
+	// A .cia gets no arguments at all (a .3dsx gets its path as argv[0]):
+	// without a program name the option below was taken for it and ignored.
+	if (n3ds_args.empty())
+	{
+		n3ds_args.push_back(const_cast<char*>("bstone"));
+	}
+
 	if (const auto option = bstone::n3ds::choose_game())
 	{
 		n3ds_args.push_back(const_cast<char*>(option));

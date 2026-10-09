@@ -1,5 +1,9 @@
 Blake Stone: Aliens of Gold and Planet Strike for the New Nintendo 3DS, based on [BStone](https://github.com/bibendovsky/bstone) 1.3.4. 60 FPS, the 3D view on the whole top screen and the HUD with a map on the bottom screen.
 
+## New in 1.0.2
+
+- Fix: the `.cia` showed "No message system available" with more than one game in the folder. A `.cia` gets no arguments (a `.3dsx` gets its path), so the game chosen in the picker was lost.
+
 ## New in 1.0.1
 
 - HUD "Top (original)": everything on the top screen and the bottom screen turns off (it turns on for the FPS counter, or with a tap).
