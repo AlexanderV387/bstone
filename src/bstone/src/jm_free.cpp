@@ -672,6 +672,10 @@ void find_contents()
 		add_search_path("custom dir", data_dir_, search_paths);
 	}
 
+#ifdef __3DS__
+	add_search_path("3DS", "sdmc:/3ds/bstone/", search_paths);
+#endif
+
 	{
 		const auto working_full_dir = bstone::fs_utils::append_path_separator(
 			bstone::fs_utils::get_working_dir());
@@ -722,6 +726,9 @@ void find_contents()
 
 	for (const auto& search_path : search_paths)
 	{
+		bstone::globals::logger->log_information(
+			("Search path (" + search_path.source_name_ + "): \"" + search_path.path_ + "\"").c_str());
+
 		for (const auto game : games_to_find)
 		{
 			const auto already_found = std::any_of(

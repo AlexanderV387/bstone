@@ -95,14 +95,7 @@ bool file_posix_lock_fcntl(int handle, int fcntl_op, short lock_type)
 	return fcntl(handle, fcntl_op, &posix_flock) == 0;
 }
 
-#if defined(__3DS__)
-// The 3DS SD card has no file locks; only this process uses the files.
-
-bool file_posix_lock_flock(int, short)
-{
-	return true;
-}
-#elif !defined(F_OFD_SETLK)
+#ifndef F_OFD_SETLK
 bool file_posix_lock_flock(int handle, short lock_type)
 {
 	return flock(handle, lock_type | LOCK_NB) == 0;
@@ -111,7 +104,12 @@ bool file_posix_lock_flock(int handle, short lock_type)
 
 bool file_posix_lock_shared(int handle)
 {
-#ifdef F_OFD_SETLK
+#if defined(__3DS__)
+	// newlib declares F_OFD_SETLK, but the 3DS has no file locks and fcntl
+	// always fails: every file failed to open. Only this game uses them.
+	static_cast<void>(handle);
+	return true;
+#elif defined(F_OFD_SETLK)
 	return file_posix_lock_fcntl(handle, F_OFD_SETLK, F_RDLCK);
 #else
 	return file_posix_lock_flock(handle, LOCK_SH);
@@ -120,7 +118,12 @@ bool file_posix_lock_shared(int handle)
 
 bool file_posix_lock_exclusive(int handle)
 {
-#ifdef F_OFD_SETLK
+#if defined(__3DS__)
+	// newlib declares F_OFD_SETLK, but the 3DS has no file locks and fcntl
+	// always fails: every file failed to open. Only this game uses them.
+	static_cast<void>(handle);
+	return true;
+#elif defined(F_OFD_SETLK)
 	return file_posix_lock_fcntl(handle, F_OFD_SETLK, F_WRLCK);
 #else
 	return file_posix_lock_flock(handle, LOCK_EX);
@@ -129,7 +132,12 @@ bool file_posix_lock_exclusive(int handle)
 
 bool file_posix_unlock(int handle)
 {
-#ifdef F_OFD_SETLK
+#if defined(__3DS__)
+	// newlib declares F_OFD_SETLK, but the 3DS has no file locks and fcntl
+	// always fails: every file failed to open. Only this game uses them.
+	static_cast<void>(handle);
+	return true;
+#elif defined(F_OFD_SETLK)
 	return file_posix_lock_fcntl(handle, F_OFD_SETLK, F_UNLCK);
 #else
 	return file_posix_lock_flock(handle, LOCK_UN);
