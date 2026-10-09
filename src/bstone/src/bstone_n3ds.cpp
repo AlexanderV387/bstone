@@ -25,6 +25,17 @@ SPDX-License-Identifier: MIT
 #include "bstone_cvar.h"
 #include "bstone_cvar_mgr.h"
 
+namespace bstone {
+namespace n3ds {
+namespace {
+
+constexpr auto trace_path = "sdmc:/3ds/bstone/bstone_exit.txt";
+std::uint64_t trace_start_ = 0;
+
+} // namespace
+} // namespace n3ds
+} // namespace bstone
+
 // libctru's main thread stack is 32 KiB by default: too small for BStone.
 extern "C"
 {
@@ -127,6 +138,17 @@ constexpr auto c_stick_max = 146;
 } // namespace
 
 void initialize_bottom_screen(); // below
+
+void trace(const char* step)
+{
+	// Appended and closed at once: it survives the console being turned off
+	// while the game hangs. Started anew at each launch (initialize()).
+	if (const auto file = std::fopen(trace_path, "a"))
+	{
+		std::fprintf(file, "%llu ms: %s\n", static_cast<unsigned long long>(osGetTime() - trace_start_), step);
+		std::fclose(file);
+	}
+}
 bool is_closing(); // below
 
 // An exception that nothing caught (e.g. before the game's own error
@@ -158,6 +180,15 @@ bool is_closing(); // below
 
 void initialize()
 {
+	trace_start_ = osGetTime();
+
+	if (const auto file = std::fopen(trace_path, "w"))
+	{
+		std::fclose(file);
+	}
+
+	trace("start");
+
 	osSetSpeedupEnable(true);
 	SDL_SetMainReady();
 	std::set_terminate(on_terminate);
@@ -815,6 +846,16 @@ namespace {
 // Never leave for the HOME Menu or sleep mode with the bottom screen off.
 void on_apt_hook(APT_HookType hook, void*)
 {
+	switch (hook)
+	{
+		case APTHOOK_ONSUSPEND: trace("apt: suspend"); break;
+		case APTHOOK_ONRESTORE: trace("apt: restore"); break;
+		case APTHOOK_ONSLEEP: trace("apt: sleep"); break;
+		case APTHOOK_ONWAKEUP: trace("apt: wakeup"); break;
+		case APTHOOK_ONEXIT: trace("apt: exit"); break;
+		default: break;
+	}
+
 	if (is_bottom_on_)
 	{
 		return;
@@ -840,6 +881,8 @@ void on_apt_hook(APT_HookType hook, void*)
 
 void restore_bottom_screen()
 {
+	trace("atexit");
+
 	if (!is_bottom_on_)
 	{
 		set_bottom_backlight(true);

@@ -32,6 +32,10 @@ void initialize();
 // START in the menu exits.
 const char* choose_game();
 
+// Appends a timed line to sdmc:/3ds/bstone/bstone_exit.txt (closing steps:
+// the log is buffered and lost when the console is turned off).
+void trace(const char* step);
+
 // After a normal quit: with more than one game, the .cia relaunches itself
 // to show the picker again (as in the Wolfenstein 3D port).
 void on_quit();

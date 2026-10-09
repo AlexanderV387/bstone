@@ -9587,11 +9587,25 @@ void CycleColors()
 */
 void ShutdownId()
 {
+#ifdef __3DS__
+	bstone::n3ds::trace("ShutdownId: US");
+	US_Shutdown();
+	bstone::n3ds::trace("ShutdownId: sound");
+	sd_shutdown();
+	bstone::n3ds::trace("ShutdownId: input");
+	IN_Shutdown();
+	bstone::n3ds::trace("ShutdownId: video");
+	VW_Shutdown();
+	bstone::n3ds::trace("ShutdownId: cache");
+	CA_Shutdown();
+	bstone::n3ds::trace("ShutdownId: done");
+#else
 	US_Shutdown();
 	sd_shutdown();
 	IN_Shutdown();
 	VW_Shutdown();
 	CA_Shutdown();
+#endif
 
 	bstone::globals::page_mgr = nullptr;
 }
@@ -9719,6 +9733,7 @@ void pre_quit()
 		const auto ms = bstone::n3ds::get_milliseconds() - start;
 		bstone::globals::logger->log_information(
 			(std::string{"[3DS] pre_quit: "} + step + ": " + std::to_string(ms) + " ms").c_str());
+		bstone::n3ds::trace((std::string{"pre_quit: "} + step).c_str());
 	};
 #endif
 
@@ -10135,6 +10150,7 @@ int main(
 		const auto ms = bstone::n3ds::get_milliseconds() - n3ds_quit_time;
 		bstone::globals::logger->log_information(
 			(std::string{"[3DS] "} + step + ": " + std::to_string(ms) + " ms").c_str());
+		bstone::n3ds::trace(step);
 	};
 
 	n3ds_log_time("quit");
@@ -10159,6 +10175,8 @@ int main(
 	{
 		bstone::n3ds::on_quit();
 	}
+
+	bstone::n3ds::trace("main returns");
 #endif
 
 	if (is_failed)
