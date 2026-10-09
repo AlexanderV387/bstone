@@ -6614,6 +6614,7 @@ enum N3dsControlsItem
 	n3ds_ci_touch_turning,
 	n3ds_ci_touch_speed,
 	n3ds_ci_show_fps,
+	n3ds_ci_hud,
 	n3ds_ci_count,
 };
 
@@ -6625,6 +6626,7 @@ CP_itemtype n3ds_controls_menu[] =
 	{AT_ENABLED, "TOUCH TURNING", nullptr},
 	{AT_ENABLED, "TOUCH SPEED", nullptr},
 	{AT_ENABLED, "FPS COUNTER", nullptr},
+	{AT_ENABLED, "HUD", nullptr},
 };
 
 CP_iteminfo n3ds_controls_items = {MENU_X - 31, MENU_Y + 10, n3ds_ci_count, 0, 0, 9, {67, -1, 184, 7, 1}};
@@ -6640,6 +6642,7 @@ std::string n3ds_controls_value(int item)
 		case n3ds_ci_touch_turning: return n3ds::is_touch_turning() ? "ON" : "OFF";
 		case n3ds_ci_touch_speed: return std::to_string(n3ds::get_touch_speed());
 		case n3ds_ci_show_fps: return n3ds::is_fps_shown() ? "ON" : "OFF";
+		case n3ds_ci_hud: return n3ds::is_hud_on_bottom() ? "BOTTOM SCREEN" : "TOP (ORIGINAL)";
 
 		case n3ds_ci_run_mode:
 			switch (n3ds::get_run_mode())
@@ -6668,6 +6671,13 @@ void n3ds_controls_change(int item, int delta)
 		case n3ds_ci_dual_stick: n3ds::set_dual_stick(!n3ds::is_dual_stick()); break;
 		case n3ds_ci_touch_turning: n3ds::set_touch_turning(!n3ds::is_touch_turning()); break;
 		case n3ds_ci_show_fps: n3ds::set_fps_shown(!n3ds::is_fps_shown()); break;
+
+		case n3ds_ci_hud:
+			// The 3D view changes height: full top screen, or between the bars.
+			n3ds::set_hud_on_bottom(!n3ds::is_hud_on_bottom());
+			NewViewSize();
+			SetPlaneViewSize();
+			break;
 
 		case n3ds_ci_stick_sensitivity:
 			n3ds::set_stick_sensitivity(wrap(n3ds::get_stick_sensitivity() + delta, n3ds::min_sensitivity, n3ds::max_sensitivity));

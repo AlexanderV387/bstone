@@ -464,6 +464,7 @@ set(BSTONE_LIB_MISC_SOURCES
 	src/bstone_entry_point.cpp
 	src/bstone_n3ds.cpp
 	src/bstone_n3ds.h
+	src/bstone_n3ds_hud.cpp
 	src/bstone_entry_point.h
 	src/bstone_enum_flags.h
 	src/bstone_exception.cpp

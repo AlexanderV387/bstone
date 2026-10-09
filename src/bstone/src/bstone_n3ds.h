@@ -93,6 +93,20 @@ private:
 	std::uint64_t start_;
 };
 
+// Bottom screen: 320x240 pixels (0xRRGGBBAA), row by row. present_bottom()
+// adds the frame counter, copies it rotated to the screen and swaps; without
+// the HUD the buffer is cleared first. Called once per frame by the video.
+constexpr auto bottom_width = 320;
+constexpr auto bottom_height = 240;
+
+std::uint32_t* get_bottom_buffer() noexcept;
+void present_bottom(bool is_hud);
+
+// Fills the bottom screen buffer with the HUD: the top bar (location and
+// messages), the map of what was explored and the status bar, taken from
+// the 320x200 UI buffer (palette indices, colors in framebuffer format).
+void draw_bottom_hud(const std::uint8_t* ui, const std::uint32_t* colors);
+
 // Counts a shown frame; the bottom screen shows the frames per second, the
 // milliseconds per frame and how many of them present() took (composing
 // and copying to the screen, without the vsync wait).
@@ -121,8 +135,10 @@ bool is_touch_turning() noexcept; // drag on the touch screen to turn
 void set_touch_turning(bool value);
 int get_touch_speed() noexcept; // 1-10
 void set_touch_speed(int value);
-bool is_fps_shown() noexcept; // frame counter on the bottom screen
+bool is_fps_shown() noexcept; // small frame counter on the bottom screen
 void set_fps_shown(bool value);
+bool is_hud_on_bottom() noexcept; // 3D view on the whole top screen
+void set_hud_on_bottom(bool value);
 
 // Call once per frame with the run binding (already inverted by "always
 // run"); returns whether the player runs, for the D-pad too.

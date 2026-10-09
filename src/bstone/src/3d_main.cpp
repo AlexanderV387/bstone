@@ -9673,13 +9673,27 @@ void SetViewSize()
 
 	centerx = (viewwidth / 2) - 1;
 
-#ifdef __vita__
-	vga_3d_view_top_y = (ref_3d_view_top_y * vga_height) / vga_ref_height + 1;
-	vga_3d_view_bottom_y = vga_3d_view_top_y + viewheight + 1;
-#else    
-	vga_3d_view_top_y = (ref_3d_view_top_y * vga_height) / vga_ref_height;
-	vga_3d_view_bottom_y = vga_3d_view_top_y + viewheight;
+#ifdef __3DS__
+	if (bstone::n3ds::is_hud_on_bottom())
+	{
+		// The status bars go to the bottom screen: the 3D view takes the
+		// whole buffer, and so the whole top screen.
+		viewheight = (vga_height / alignment) * alignment;
+		vga_3d_view_top_y = 0;
+		vga_3d_view_bottom_y = viewheight;
+	}
+	else
 #endif
+	{
+#ifdef __vita__
+		vga_3d_view_top_y = (ref_3d_view_top_y * vga_height) / vga_ref_height + 1;
+		vga_3d_view_bottom_y = vga_3d_view_top_y + viewheight + 1;
+#else
+		vga_3d_view_top_y = (ref_3d_view_top_y * vga_height) / vga_ref_height;
+		vga_3d_view_bottom_y = vga_3d_view_top_y + viewheight;
+#endif
+	}
+
 	screenofs = vga_3d_view_top_y * viewwidth;
 
 	// calculate trace angles and projection constants

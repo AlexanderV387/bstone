@@ -418,14 +418,42 @@ std::uint64_t get_milliseconds()
 
 namespace {
 
-// Bottom screen: 320x240 RGBA8, rotated like the top one.
-void fill_bottom(std::uint32_t* framebuffer, int x, int y, int width, int height, std::uint32_t color)
+bool is_bottom_on_ = true;
+bool was_touching_ = false;
+aptHookCookie apt_hook_cookie_{};
+
+void set_bottom_backlight(bool is_on)
 {
-	for (auto i = x; i < x + width; ++i)
+	if (R_FAILED(gspLcdInit()))
 	{
-		for (auto j = y; j < y + height; ++j)
+		return;
+	}
+
+	if (is_on)
+	{
+		GSPLCD_PowerOnBacklight(GSPLCD_SCREEN_BOTTOM);
+	}
+	else
+	{
+		GSPLCD_PowerOffBacklight(GSPLCD_SCREEN_BOTTOM);
+	}
+
+	gspLcdExit();
+}
+
+// The bottom screen is composed in this buffer (row by row) and copied
+// rotated to its framebuffer once per frame.
+std::uint32_t bottom_buffer_[bottom_width * bottom_height];
+
+bool is_bottom_hud_shown_ = false;
+
+void fill_bottom(std::uint32_t* buffer, int x, int y, int width, int height, std::uint32_t color)
+{
+	for (auto j = y; j < y + height; ++j)
+	{
+		for (auto i = x; i < x + width; ++i)
 		{
-			framebuffer[i * 240 + (239 - j)] = color;
+			buffer[j * bottom_width + i] = color;
 		}
 	}
 }
@@ -461,6 +489,10 @@ void draw_number(std::uint32_t* framebuffer, int number, int x, int y, int scale
 
 int frame_count_ = 0;
 std::uint64_t fps_time_ = 0;
+int fps_ = 0;
+int frame_ms_ = 0;
+int present_ms_ = 0;
+int profile_ms_[profile_slot_count] = {};
 std::uint64_t present_us_total_ = 0;
 std::uint64_t profile_us_totals_[profile_slot_count] = {};
 
@@ -503,33 +535,74 @@ void count_frame(int present_us)
 		return;
 	}
 
-	const auto fps = static_cast<int>((frame_count_ * 1000) / elapsed);
-	const auto frame_ms = static_cast<int>(elapsed / frame_count_);
-	const auto present_ms = static_cast<int>(present_us_total_ / frame_count_ / 1000);
-	int profile_ms[profile_slot_count];
+	fps_ = static_cast<int>((frame_count_ * 1000) / elapsed);
+	frame_ms_ = static_cast<int>(elapsed / frame_count_);
+	present_ms_ = static_cast<int>(present_us_total_ / frame_count_ / 1000);
 
 	for (auto i = 0; i < profile_slot_count; ++i)
 	{
-		profile_ms[i] = static_cast<int>(profile_us_totals_[i] / frame_count_ / 1000);
+		profile_ms_[i] = static_cast<int>(profile_us_totals_[i] / frame_count_ / 1000);
 		profile_us_totals_[i] = 0;
 	}
 
 	frame_count_ = 0;
 	present_us_total_ = 0;
 	fps_time_ = now;
+}
 
-	// Frames per second (big, white); milliseconds per frame (green) and of
-	// present() (yellow); milliseconds of walls (cyan), floors and ceilings
-	// (magenta) and sprites (orange).
+std::uint32_t* get_bottom_buffer() noexcept
+{
+	return bottom_buffer_;
+}
+
+void present_bottom(bool is_hud)
+{
+	is_bottom_hud_shown_ = is_hud;
+
+	if (!is_hud)
+	{
+		fill_bottom(bottom_buffer_, 0, 0, bottom_width, bottom_height, 0x000000FFU);
+	}
+
+	if (is_fps_shown())
+	{
+		// Small, in the top right corner of the map area: frames per second
+		// (white) and milliseconds per frame (green).
+		fill_bottom(bottom_buffer_, 256, 18, 62, 13, 0x000000FFU);
+		draw_number(bottom_buffer_, fps_, 259, 20, 2, 0xFFFFFFFFU);
+		draw_number(bottom_buffer_, frame_ms_, 289, 20, 2, 0x80FF80FFU);
+	}
+
+	// The HUD keeps the bottom screen on.
+	if (is_hud && !is_bottom_on_)
+	{
+		is_bottom_on_ = true;
+		set_bottom_backlight(true);
+	}
+
+	// Rotated copy in 8x8 blocks, as for the top screen.
 	const auto framebuffer = reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, nullptr, nullptr));
-	fill_bottom(framebuffer, 0, 0, 320, 240, 0x000000FFU);
-	draw_number(framebuffer, fps, 20, 16, 14, 0xFFFFFFFFU);
-	draw_number(framebuffer, frame_ms, 20, 110, 7, 0x80FF80FFU);
-	draw_number(framebuffer, present_ms, 170, 110, 7, 0xFFFF40FFU);
-	draw_number(framebuffer, profile_ms[profile_walls], 20, 180, 7, 0x40FFFFFFU);
-	draw_number(framebuffer, profile_ms[profile_planes], 120, 180, 7, 0xFF40FFFFU);
-	draw_number(framebuffer, profile_ms[profile_sprites], 220, 180, 7, 0xFFA020FFU);
-	GSPGPU_FlushDataCache(framebuffer, 320 * 240 * 4);
+	constexpr auto block = 8;
+
+	for (auto bx = 0; bx < bottom_width; bx += block)
+	{
+		for (auto by = 0; by < bottom_height; by += block)
+		{
+			for (auto x = bx; x < bx + block; ++x)
+			{
+				auto dst = &framebuffer[x * bottom_height + (bottom_height - 1 - by)];
+				auto src = &bottom_buffer_[by * bottom_width + x];
+
+				for (auto y = 0; y < block; ++y)
+				{
+					*dst-- = *src;
+					src += bottom_width;
+				}
+			}
+		}
+	}
+
+	GSPGPU_FlushDataCache(framebuffer, bottom_width * bottom_height * 4);
 	gfxScreenSwapBuffers(GFX_BOTTOM, false);
 }
 
@@ -554,7 +627,9 @@ auto touch_speed_cvar = CVar{
 	CVarInt32Tag{}, StringView{"n3ds_touch_speed"}, CVarFlags::archive,
 	4, min_sensitivity, max_sensitivity};
 
-auto show_fps_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_show_fps"}, CVarFlags::archive, true};
+auto show_fps_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_show_fps"}, CVarFlags::archive, false};
+
+auto hud_on_bottom_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_hud_on_bottom"}, CVarFlags::archive, true};
 
 } // namespace
 
@@ -566,6 +641,7 @@ void initialize_cvars(CVarMgr& cvar_mgr)
 	cvar_mgr.add(touch_turning_cvar);
 	cvar_mgr.add(touch_speed_cvar);
 	cvar_mgr.add(show_fps_cvar);
+	cvar_mgr.add(hud_on_bottom_cvar);
 }
 
 bool is_dual_stick() noexcept { return dual_stick_cvar.get_bool(); }
@@ -579,6 +655,8 @@ void set_touch_turning(bool value) { touch_turning_cvar.set_bool(value); }
 int get_touch_speed() noexcept { return touch_speed_cvar.get_int32(); }
 void set_touch_speed(int value) { touch_speed_cvar.set_int32(value); }
 bool is_fps_shown() noexcept { return show_fps_cvar.get_bool(); }
+bool is_hud_on_bottom() noexcept { return hud_on_bottom_cvar.get_bool(); }
+void set_hud_on_bottom(bool value) { hud_on_bottom_cvar.set_bool(value); }
 void set_fps_shown(bool value) { show_fps_cvar.set_bool(value); }
 
 // ==========================================================================
@@ -656,29 +734,6 @@ bool is_running() noexcept
 
 namespace {
 
-bool is_bottom_on_ = true;
-bool was_touching_ = false;
-aptHookCookie apt_hook_cookie_{};
-
-void set_bottom_backlight(bool is_on)
-{
-	if (R_FAILED(gspLcdInit()))
-	{
-		return;
-	}
-
-	if (is_on)
-	{
-		GSPLCD_PowerOnBacklight(GSPLCD_SCREEN_BOTTOM);
-	}
-	else
-	{
-		GSPLCD_PowerOffBacklight(GSPLCD_SCREEN_BOTTOM);
-	}
-
-	gspLcdExit();
-}
-
 // Never leave for the HOME Menu or sleep mode with the bottom screen off.
 void on_apt_hook(APT_HookType hook, void*)
 {
@@ -725,8 +780,11 @@ void poll_bottom_screen_toggle()
 {
 	const auto is_touching = (hidKeysHeld() & KEY_TOUCH) != 0;
 
-	// With touch turning, a drag in game turns instead.
-	if (is_touching && !was_touching_ && !(is_touch_turning() && is_game_mode_))
+	// With touch turning, a drag in game turns instead; with the HUD on the
+	// bottom screen, a tap does not turn it off.
+	if (is_touching && !was_touching_ &&
+		!(is_touch_turning() && is_game_mode_) &&
+		!(is_bottom_hud_shown_ && is_bottom_on_))
 	{
 		is_bottom_on_ = !is_bottom_on_;
 		set_bottom_backlight(is_bottom_on_);

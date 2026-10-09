@@ -41,11 +41,14 @@ The buttons can be reassigned in **Options > Controls > Customize controls**.
 | Run | Stick pushed (fully pushed runs), hold button (default), press once (runs until you stop) |
 | Touch turning | Drag on the touch screen to turn, for consoles without C-stick |
 | Touch speed | 1-10 |
-| FPS counter | Frames per second and timings on the bottom screen |
+| FPS counter | Small counter on the bottom screen: frames per second and milliseconds per frame (off by default) |
+| HUD | Bottom screen (default): the 3D view fills the top screen; the bottom screen shows the location bar, a map of what you explored and the status bar. Top (original): the bars around the 3D view, as on PC |
 
-A tap on the touch screen turns the bottom screen off or on (in game with touch turning, a drag turns instead).
+A tap on the touch screen turns the bottom screen off or on (not while it shows the HUD; in game with touch turning, a drag turns instead).
 
 ## 3DS changes
+
+- 60 FPS: the frame is composed in one pass straight into the top screen's framebuffer and waits for the vertical blank; the game no longer also sleeps until its next 70 Hz tic (the two waits drifted apart: about 40 FPS).
 
 - Software renderer at 400x240 on the top screen; no OpenGL, Vulkan or OpenAL.
 - The game timer is computed from the elapsed time instead of a ticker thread: 3DS threads on the same core do not preempt each other.

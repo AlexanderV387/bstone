@@ -571,7 +571,25 @@ void SwVideo::n3ds_present()
 	const auto is_middle_wide = (vid_is_hud && is_widescreen) || (!vid_is_hud && is_stretched);
 	const auto is_bottom_wide = is_stretched;
 
-	if (is_top_wide && is_middle_wide && is_bottom_wide)
+	// HUD on the bottom screen: the 3D view fills the top screen; only what
+	// the game draws over the view (messages, pause...) stays on top.
+	const auto is_bottom_hud = vid_is_hud && n3ds::is_hud_on_bottom();
+
+	if (is_bottom_hud)
+	{
+		const auto& middle_rect = is_middle_wide ? ui_wide_middle_dst_rect_ : ui_4x3_middle_dst_rect_;
+		const auto src_rect = sys::Rectangle{0, ref_3d_view_top_y, vga_ref_width, ref_3d_view_height};
+		const auto dst_rect = sys::Rectangle
+		{
+			middle_rect.x,
+			middle_rect.y + ((ref_3d_view_top_y - ref_view_top_y) * middle_rect.height) / ref_view_height,
+			middle_rect.width,
+			(ref_3d_view_height * middle_rect.height) / ref_view_height,
+		};
+
+		n3ds_blit(ui, vga_ref_width, vga_ref_height, &src_rect, dst_rect, mask);
+	}
+	else if (is_top_wide && is_middle_wide && is_bottom_wide)
 	{
 		n3ds_blit(ui, vga_ref_width, vga_ref_height, nullptr, ui_wide_dst_rect_, mask);
 	}
@@ -592,7 +610,7 @@ void SwVideo::n3ds_present()
 
 	// Filler
 	//
-	if (!is_stretched)
+	if (!is_stretched && !is_bottom_hud)
 	{
 		const auto fill_color = vid_is_movie ?
 			black :
@@ -637,6 +655,14 @@ void SwVideo::n3ds_present()
 			}
 		}
 	}
+
+	// Bottom screen: the status bars and the map, or nothing.
+	if (is_bottom_hud)
+	{
+		n3ds::draw_bottom_hud(ui, n3ds_colors_.data());
+	}
+
+	n3ds::present_bottom(is_bottom_hud);
 
 	n3ds::count_frame(static_cast<int>(n3ds::get_microseconds() - start_ms));
 	n3ds::present_top_framebuffer();
