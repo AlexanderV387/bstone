@@ -189,6 +189,25 @@ void initialize()
 
 	trace("start");
 
+	// Diagnostics for the closing hang: can this process use the New 3DS's
+	// third core, and how much of the system core does it reserve?
+	{
+		const auto thread = threadCreate([](void*) {}, nullptr, 4096, 0x30, 2, false);
+		trace(thread != nullptr ? "core 2: available" : "core 2: not available");
+
+		if (thread != nullptr)
+		{
+			threadJoin(thread, U64_MAX);
+			threadFree(thread);
+		}
+
+		auto percent = u32{};
+		char text[48];
+		std::snprintf(text, sizeof(text), "system core limit: %lu%%",
+			R_SUCCEEDED(APT_GetAppCpuTimeLimit(&percent)) ? static_cast<unsigned long>(percent) : 999UL);
+		trace(text);
+	}
+
 	osSetSpeedupEnable(true);
 	SDL_SetMainReady();
 	std::set_terminate(on_terminate);
