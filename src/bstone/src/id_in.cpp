@@ -162,6 +162,10 @@ auto in_mouse_sensitivity_cvar = bstone::CVar{
 
 void in_initialize_cvars(bstone::CVarMgr& cvar_mgr)
 {
+#ifdef __3DS__
+	bstone::n3ds::initialize_cvars(cvar_mgr);
+#endif
+
 	cvar_mgr.add(in_is_mouse_enabled_cvar);
 	cvar_mgr.add(in_mouse_sensitivity_cvar);
 }

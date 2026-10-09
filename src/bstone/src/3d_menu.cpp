@@ -474,9 +474,19 @@ CP_itemtype SndMenu[] =
 	{AT_ENABLED, "OPL3 TYPE", 0},
 };
 
+#ifdef __3DS__
+void n3ds_controls_routine(std::int16_t);
+#endif
+
 CP_itemtype CtlMenu[] = {
+#ifdef __3DS__
+	// No mouse: the 3DS settings instead (sticks, run mode, touch screen).
+	{AT_ENABLED, "3DS CONTROLS", n3ds_controls_routine},
+	{AT_DISABLED, "", nullptr},
+#else
 	{AT_DISABLED, "MOUSE ENABLED", 0},
 	{AT_DISABLED, "MOUSE SENSITIVITY", MouseSensitivity},
+#endif
 	{AT_ENABLED, "CUSTOMIZE CONTROLS", CustomControls}
 };
 
@@ -3429,10 +3439,17 @@ void CP_Control(
 		switch (which)
 		{
 		case MOUSEENABLE:
+#ifdef __3DS__
+			// "3DS CONTROLS": back from its submenu.
+			DrawCtlScreen();
+			MenuFadeIn();
+			WaitKeyUp();
+#else
 			in_set_is_mouse_enabled(!in_is_mouse_enabled());
 			DrawCtlScreen();
 			CusItems.curpos = -1;
 			ShootSnd();
+#endif
 			break;
 
 		case MOUSESENS:
@@ -3613,6 +3630,7 @@ void DrawCtlScreen()
 	fontnumber = 4;
 	DrawMenu(&CtlItems, &CtlMenu[0]);
 
+#ifndef __3DS__
 	x = CTL_X + CtlItems.indent - 24;
 	y = CTL_Y + Y_CTL_PIC_OFS;
 	if (in_is_mouse_enabled())
@@ -3623,6 +3641,11 @@ void DrawCtlScreen()
 	{
 		VWB_DrawPic(x, y, C_NOTSELECTEDPIC);
 	}
+#else
+	static_cast<void>(x);
+	static_cast<void>(y);
+	static_cast<void>(Y_CTL_PIC_OFS);
+#endif
 
 	//
 	// PICK FIRST AVAILABLE SPOT
@@ -6575,3 +6598,149 @@ void menu_enable_all_episodes()
 	}
 }
 // BBi
+
+#ifdef __3DS__
+// ==========================================================================
+// 3DS CONTROLS menu (Options > Controls): the controls standard of the
+// n3ds-ports project, shared with the Wolfenstein 3D port.
+
+namespace {
+
+enum N3dsControlsItem
+{
+	n3ds_ci_dual_stick,
+	n3ds_ci_stick_sensitivity,
+	n3ds_ci_run_mode,
+	n3ds_ci_touch_turning,
+	n3ds_ci_touch_speed,
+	n3ds_ci_show_fps,
+	n3ds_ci_count,
+};
+
+CP_itemtype n3ds_controls_menu[] =
+{
+	{AT_ENABLED, "DUAL STICK", nullptr},
+	{AT_ENABLED, "STICK SENSITIVITY", nullptr},
+	{AT_ENABLED, "RUN", nullptr},
+	{AT_ENABLED, "TOUCH TURNING", nullptr},
+	{AT_ENABLED, "TOUCH SPEED", nullptr},
+	{AT_ENABLED, "FPS COUNTER", nullptr},
+};
+
+CP_iteminfo n3ds_controls_items = {MENU_X - 31, MENU_Y + 10, n3ds_ci_count, 0, 0, 9, {67, -1, 184, 7, 1}};
+
+std::string n3ds_controls_value(int item)
+{
+	namespace n3ds = bstone::n3ds;
+
+	switch (item)
+	{
+		case n3ds_ci_dual_stick: return n3ds::is_dual_stick() ? "ON" : "OFF (CLASSIC)";
+		case n3ds_ci_stick_sensitivity: return std::to_string(n3ds::get_stick_sensitivity());
+		case n3ds_ci_touch_turning: return n3ds::is_touch_turning() ? "ON" : "OFF";
+		case n3ds_ci_touch_speed: return std::to_string(n3ds::get_touch_speed());
+		case n3ds_ci_show_fps: return n3ds::is_fps_shown() ? "ON" : "OFF";
+
+		case n3ds_ci_run_mode:
+			switch (n3ds::get_run_mode())
+			{
+				case n3ds::run_mode_stick: return "STICK PUSHED";
+				case n3ds::run_mode_toggle: return "PRESS ONCE";
+				default: return "HOLD BUTTON";
+			}
+
+		default: return "";
+	}
+}
+
+// Next (delta 1) or previous (delta -1) value, wrapping around.
+void n3ds_controls_change(int item, int delta)
+{
+	namespace n3ds = bstone::n3ds;
+
+	const auto wrap = [](int value, int min, int max)
+	{
+		return value < min ? max : (value > max ? min : value);
+	};
+
+	switch (item)
+	{
+		case n3ds_ci_dual_stick: n3ds::set_dual_stick(!n3ds::is_dual_stick()); break;
+		case n3ds_ci_touch_turning: n3ds::set_touch_turning(!n3ds::is_touch_turning()); break;
+		case n3ds_ci_show_fps: n3ds::set_fps_shown(!n3ds::is_fps_shown()); break;
+
+		case n3ds_ci_stick_sensitivity:
+			n3ds::set_stick_sensitivity(wrap(n3ds::get_stick_sensitivity() + delta, n3ds::min_sensitivity, n3ds::max_sensitivity));
+			break;
+
+		case n3ds_ci_touch_speed:
+			n3ds::set_touch_speed(wrap(n3ds::get_touch_speed() + delta, n3ds::min_sensitivity, n3ds::max_sensitivity));
+			break;
+
+		case n3ds_ci_run_mode:
+			n3ds::set_run_mode(wrap(n3ds::get_run_mode() + delta, n3ds::run_mode_stick, n3ds::run_mode_toggle));
+			break;
+
+		default:
+			break;
+	}
+}
+
+void n3ds_controls_draw_menu()
+{
+	ClearMScreen();
+	DrawMenuTitle("3DS CONTROLS");
+	DrawInstructions(IT_STANDARD);
+	DrawMenu(&n3ds_controls_items, n3ds_controls_menu);
+}
+
+void n3ds_controls_draw_switch(std::int16_t)
+{
+	for (auto i = 0; i < n3ds_controls_items.amount; ++i)
+	{
+		draw_carousel(i, &n3ds_controls_items, n3ds_controls_menu, n3ds_controls_value(i));
+	}
+}
+
+void n3ds_controls_carousel(const int item_index, const bool is_left, const bool)
+{
+	n3ds_controls_change(item_index, is_left ? -1 : 1);
+	n3ds_controls_draw_menu();
+	n3ds_controls_draw_switch(static_cast<std::int16_t>(item_index));
+	TicDelay(20);
+}
+
+} // namespace
+
+void n3ds_controls_routine(std::int16_t)
+{
+	for (auto& item : n3ds_controls_menu)
+	{
+		item.carousel_func_ = n3ds_controls_carousel;
+	}
+
+	CA_CacheScreen(BACKGROUND_SCREENPIC);
+	n3ds_controls_draw_menu();
+	VW_UpdateScreen();
+	MenuFadeIn();
+	WaitKeyUp();
+
+	std::int16_t which;
+
+	do
+	{
+		which = HandleMenu(&n3ds_controls_items, n3ds_controls_menu, n3ds_controls_draw_switch);
+
+		if (which >= 0)
+		{
+			// A changes the value too.
+			n3ds_controls_change(which, 1);
+			n3ds_controls_draw_menu();
+			ShootSnd();
+			WaitKeyUp();
+		}
+	} while (which >= 0);
+
+	MenuFadeOut();
+}
+#endif // __3DS__

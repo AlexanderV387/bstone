@@ -451,12 +451,16 @@ void PollMouseButtons()
 
 void PollKeyboardMove()
 {
+#ifdef __3DS__
+	const auto is_running = bstone::n3ds::is_running(); // the 3DS run modes
+#else
 	bool is_running = in_is_binding_pressed(e_bi_run);
 
 	if (gp_is_always_run())
 	{
 		is_running = !is_running;
 	}
+#endif
 
 	const auto value = tics * (is_running ? RUNMOVE : BASEMOVE);
 
@@ -622,15 +626,14 @@ void PollControls()
 	//
 	// get movements
 	//
+#ifdef __3DS__
+	bstone::n3ds::update_running(in_is_binding_pressed(e_bi_run) != gp_is_always_run());
+#endif
+
 	PollKeyboardMove();
 
 #ifdef __3DS__
-	bstone::n3ds::poll_analog(
-		tics,
-		in_is_binding_pressed(e_bi_run) != gp_is_always_run(),
-		controlx,
-		controly,
-		strafe_value);
+	bstone::n3ds::poll_analog(tics, controlx, controly, strafe_value);
 #endif
 
 	if (in_is_mouse_enabled())

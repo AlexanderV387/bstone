@@ -30,7 +30,20 @@ Configuration, saved games and the log (`bstone_log.txt`) go to the same folder.
 | SELECT | Pause | |
 | START | Menu | Exit menu |
 
-The buttons can be reassigned in the game's controls menu.
+The buttons can be reassigned in **Options > Controls > Customize controls**.
+
+**Options > Controls > 3DS controls** (saved in the configuration file):
+
+| Option | Values |
+|---|---|
+| Dual stick | On: Circle Pad moves and strafes, C-stick turns. Off (classic): Circle Pad moves and turns |
+| Stick sensitivity | 1-10 (C-stick turn speed) |
+| Run | Stick pushed (fully pushed runs), hold button (default), press once (runs until you stop) |
+| Touch turning | Drag on the touch screen to turn, for consoles without C-stick |
+| Touch speed | 1-10 |
+| FPS counter | Frames per second and timings on the bottom screen |
+
+A tap on the touch screen turns the bottom screen off or on (in game with touch turning, a drag turns instead).
 
 ## 3DS changes
 

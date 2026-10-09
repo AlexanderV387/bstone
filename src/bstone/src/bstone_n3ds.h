@@ -17,6 +17,9 @@ SPDX-License-Identifier: MIT
 #include <cstdint>
 
 namespace bstone {
+
+class CVarMgr;
+
 namespace n3ds {
 
 // What SDL's own 3DS main would do: 804 MHz on the New 3DS.
@@ -88,8 +91,44 @@ private:
 // and copying to the screen, without the vsync wait).
 void count_frame(int present_us);
 
-// Circle Pad: move and strafe. C-stick: turn.
-void poll_analog(int tics, bool is_running, int& control_x, int& control_y, int& strafe);
+// Settings, saved in the configuration file (n3ds_* cvars).
+void initialize_cvars(CVarMgr& cvar_mgr);
+
+constexpr auto min_sensitivity = 1;
+constexpr auto max_sensitivity = 10;
+
+enum RunMode
+{
+	run_mode_stick, // the stick fully pushed runs; the button too
+	run_mode_hold, // while the run button is held (default)
+	run_mode_toggle, // press once: run until the player stops moving
+};
+
+bool is_dual_stick() noexcept;
+void set_dual_stick(bool value);
+int get_stick_sensitivity() noexcept; // C-stick turn speed, 1-10
+void set_stick_sensitivity(int value);
+int get_run_mode() noexcept;
+void set_run_mode(int value);
+bool is_touch_turning() noexcept; // drag on the touch screen to turn
+void set_touch_turning(bool value);
+int get_touch_speed() noexcept; // 1-10
+void set_touch_speed(int value);
+bool is_fps_shown() noexcept; // frame counter on the bottom screen
+void set_fps_shown(bool value);
+
+// Call once per frame with the run binding (already inverted by "always
+// run"); returns whether the player runs, for the D-pad too.
+bool update_running(bool run_button);
+bool is_running() noexcept;
+
+// A tap on the touch screen turns the bottom screen off or on (in game with
+// touch turning, a drag turns instead). Called by handle_buttons().
+void poll_bottom_screen_toggle();
+
+// Circle Pad: move and strafe (dual stick) or move and turn (classic).
+// C-stick: turn. Touch screen drag: turn (optional).
+void poll_analog(int tics, int& control_x, int& control_y, int& strafe);
 
 } // namespace n3ds
 } // namespace bstone
