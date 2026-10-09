@@ -30,6 +30,10 @@ void set_game_mode(bool is_game_mode) noexcept;
 // While a binding is being assigned, A and B are not Enter and Escape.
 void set_assigning(bool is_assigning) noexcept;
 
+// Shows a fatal error on the top screen until START is pressed: the 3DS has
+// no message boxes, so without it the game would just close.
+void show_error(const char* message);
+
 // Turns button presses and releases into key events. Called after the SDL
 // events are polled (SDL reads the buttons with hidScanInput).
 void handle_buttons();

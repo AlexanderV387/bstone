@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT
 
 #include "bstone_n3ds.h"
 
+#include <cstdio>
 #include <cstdlib>
 
 #include <3ds.h>
@@ -117,6 +118,32 @@ void initialize()
 {
 	osSetSpeedupEnable(true);
 	SDL_SetMainReady();
+}
+
+void show_error(const char* message)
+{
+	gfxInitDefault();
+	consoleInit(GFX_TOP, nullptr);
+
+	std::printf(
+		"\n BStone error:\n\n%s\n\n"
+		" Log: /3ds/bstone/bstone_log.txt\n\n"
+		" START: exit\n",
+		message != nullptr ? message : "");
+
+	while (aptMainLoop())
+	{
+		hidScanInput();
+
+		if ((hidKeysDown() & KEY_START) != 0)
+		{
+			break;
+		}
+
+		gspWaitForVBlank();
+	}
+
+	gfxExit();
 }
 
 bool is_game_mode() noexcept

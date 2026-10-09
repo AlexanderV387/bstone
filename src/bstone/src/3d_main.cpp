@@ -10077,6 +10077,11 @@ int main(
 		bstone::globals::logger->log_error(error_message.c_str());
 		bstone::globals::logger->flush();
 
+#ifdef __3DS__
+		bstone::n3ds::show_error(error_message.c_str());
+		return 1;
+#endif
+
 		const auto has_log_file = bstone::fs::is_regular_file_exists(log_file_path.c_str());
 
 		try
