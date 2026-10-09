@@ -149,8 +149,6 @@ void trace(const char* step)
 		std::fclose(file);
 	}
 }
-bool is_closing(); // below
-
 // An exception that nothing caught (e.g. before the game's own error
 // handling is set up): show it instead of closing silently.
 [[noreturn]] void on_terminate()
@@ -844,11 +842,23 @@ bool is_running() noexcept
 namespace {
 
 // Never leave for the HOME Menu or sleep mode with the bottom screen off.
+void (*on_suspend_)() = nullptr;
+
 void on_apt_hook(APT_HookType hook, void*)
 {
 	switch (hook)
 	{
-		case APTHOOK_ONSUSPEND: trace("apt: suspend"); break;
+		case APTHOOK_ONSUSPEND:
+			trace("apt: suspend");
+
+			if (on_suspend_ != nullptr)
+			{
+				on_suspend_();
+				trace("apt: saved");
+			}
+
+			break;
+
 		case APTHOOK_ONRESTORE: trace("apt: restore"); break;
 		case APTHOOK_ONSLEEP: trace("apt: sleep"); break;
 		case APTHOOK_ONWAKEUP: trace("apt: wakeup"); break;
@@ -890,6 +900,11 @@ void restore_bottom_screen()
 }
 
 } // namespace
+
+void set_on_suspend(void (*callback)())
+{
+	on_suspend_ = callback;
+}
 
 void initialize_bottom_screen()
 {

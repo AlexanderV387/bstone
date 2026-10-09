@@ -9737,7 +9737,12 @@ void pre_quit()
 	};
 #endif
 
+#ifdef __3DS__
+	// Closed from the HOME Menu: already saved when leaving for it.
+	if (is_config_loaded && !bstone::n3ds::is_closing())
+#else
 	if (is_config_loaded)
+#endif
 	{
 		WriteConfig();
 #ifdef __3DS__
@@ -9754,6 +9759,26 @@ void pre_quit()
 	log_time("shutdown");
 #endif
 }
+
+#ifdef __3DS__
+// Leaving for the HOME Menu, from where the game may be closed.
+void n3ds_save_on_suspend()
+{
+	if (!is_config_loaded)
+	{
+		return;
+	}
+
+	try
+	{
+		WriteConfig();
+		write_high_scores();
+	}
+	catch (...)
+	{
+	}
+}
+#endif
 
 [[noreturn]]
 void Quit()
@@ -9994,6 +10019,7 @@ int main(
 {
 #ifdef __3DS__
 	bstone::n3ds::initialize();
+	bstone::n3ds::set_on_suspend(n3ds_save_on_suspend);
 
 	// More than one game in the data folder: choose here (BStone would ask
 	// with a message box).
@@ -10013,6 +10039,7 @@ int main(
 
 	argc = static_cast<int>(n3ds_args.size());
 	argv = n3ds_args.data();
+	bstone::n3ds::trace("startup: game chosen");
 #endif
 
 #ifdef __vita__
@@ -10128,6 +10155,9 @@ int main(
 		}
 
 		bstone::globals::sys_window_mgr = &bstone::globals::sys_video_mgr->get_window_mgr();
+#ifdef __3DS__
+		bstone::n3ds::trace("startup: SDL");
+#endif
 
 		freed_main();
 

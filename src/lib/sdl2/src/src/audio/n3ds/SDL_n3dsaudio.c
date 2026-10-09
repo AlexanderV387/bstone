@@ -222,6 +222,11 @@ static void N3DSAUDIO_WaitDevice(_THIS)
         CondVar_WaitTimeout(&this->hidden->cv, &this->hidden->lock, 50000000LL);
     }
     contextUnlock(this);
+
+    /* Closed from the HOME Menu: nothing plays any more; do not spin. */
+    if (this->hidden->isCancelled && !SDL_AtomicGet(&this->shutdown)) {
+        svcSleepThread(10000000LL);
+    }
 }
 
 static Uint8 *N3DSAUDIO_GetDeviceBuf(_THIS)
@@ -244,7 +249,12 @@ static void N3DSAUDIO_CloseDevice(_THIS)
 
     contextUnlock(this);
 
-    ndspExit();
+    /* BStone (3DS port): closed from the HOME Menu, the DSP belongs to the
+       HOME Menu again and ndspExit would unload its component (its sound
+       stopped); the process ends right after. */
+    if (!this->hidden->isCancelled) {
+        ndspExit();
+    }
 
     FreePrivateData(this);
 }

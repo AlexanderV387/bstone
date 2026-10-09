@@ -36,6 +36,14 @@ const char* choose_game();
 // the log is buffered and lost when the console is turned off).
 void trace(const char* step);
 
+// Called when leaving for the HOME Menu, before the game is suspended: the
+// game saves its settings and high scores there, as it may be closed from
+// the HOME Menu (writing them then took 8 seconds instead of 0.1).
+void set_on_suspend(void (*callback)());
+
+// The HOME Menu closes the game: it only has to exit.
+bool is_closing();
+
 // After a normal quit: with more than one game, the .cia relaunches itself
 // to show the picker again (as in the Wolfenstein 3D port).
 void on_quit();
