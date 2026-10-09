@@ -61,7 +61,12 @@ void Sdl2MouseMgr::operator delete(void* ptr)
 
 void Sdl2MouseMgr::do_set_relative_mode(bool is_enable)
 {
+#ifdef __3DS__
+	// No mouse on the 3DS (SDL has no relative mode there).
+	static_cast<void>(is_enable);
+#else
 	sdl2_ensure_result(SDL_SetRelativeMouseMode(is_enable ? SDL_TRUE : SDL_FALSE));
+#endif
 }
 
 MemoryResource& Sdl2MouseMgr::get_memory_resource()
