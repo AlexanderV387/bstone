@@ -479,6 +479,7 @@ void set_bottom_backlight(bool is_on)
 std::uint32_t bottom_buffer_[bottom_width * bottom_height];
 
 bool is_bottom_hud_shown_ = false;
+int applied_bottom_mode_ = -1;
 
 void fill_bottom(std::uint32_t* buffer, int x, int y, int width, int height, std::uint32_t color)
 {
@@ -596,6 +597,23 @@ void present_bottom(bool is_hud)
 	}
 
 	is_bottom_hud_shown_ = is_hud;
+
+	// With the original HUD (everything on the top screen) the bottom screen
+	// has nothing to show: turn it off, unless the FPS counter is on. Applied
+	// when the setting changes (and at startup); a tap still turns it on.
+	const auto bottom_mode = is_hud_on_bottom() ? 1 : (is_fps_shown() ? 2 : 0);
+
+	if (bottom_mode != applied_bottom_mode_)
+	{
+		applied_bottom_mode_ = bottom_mode;
+		const auto is_on = bottom_mode != 0;
+
+		if (is_on != is_bottom_on_)
+		{
+			is_bottom_on_ = is_on;
+			set_bottom_backlight(is_on);
+		}
+	}
 
 	if (!is_hud)
 	{

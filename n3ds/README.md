@@ -42,7 +42,7 @@ The buttons can be reassigned in **Options > Controls > Customize controls**.
 | Touch turning | Drag on the touch screen to turn, for consoles without C-stick |
 | Touch speed | 1-10 |
 | FPS counter | Small counter on the bottom screen: frames per second and milliseconds per frame (off by default) |
-| HUD | Bottom screen (default): the 3D view fills the top screen; the bottom screen shows the status bar, a map of what you explored and the location bar. Top (original): the bars around the 3D view, as on PC |
+| HUD | Bottom screen (default): the 3D view fills the top screen; the bottom screen shows the status bar, a map of what you explored and the location bar. Top (original): everything on the top screen, as on PC, and the bottom screen off |
 | Status bar | Above the map (default) or below it |
 
 A tap on the touch screen turns the bottom screen off or on (not while it shows the HUD; in game with touch turning, a drag turns instead).
