@@ -10097,7 +10097,13 @@ int main(
 		bstone::LoggerFlushPolicy::none;
 	logger_open_param.file_path = log_file_path.c_str();
 
+#ifdef __3DS__
+	bstone::n3ds::trace("startup: trace check");
+#endif
 	bstone::globals::logger = bstone::make_logger(logger_open_param);
+#ifdef __3DS__
+	bstone::n3ds::trace("startup: logger");
+#endif
 	const auto logger_scope = bstone::make_scope_exit([](){ bstone::globals::logger = nullptr; });
 
 	const auto version_string = std::string{} + "BStone v" + bstone::get_version().string;
@@ -10144,6 +10150,9 @@ int main(
 	{
 		auto mt_task_manager = bstone::make_mt_task_manager(1, 4096);
 		mt_task_manager_ = mt_task_manager.get();
+#ifdef __3DS__
+		bstone::n3ds::trace("startup: task threads");
+#endif
 
 		bstone::globals::sys_system_mgr = bstone::sys::make_system_mgr(sys_logger);
 

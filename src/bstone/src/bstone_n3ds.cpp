@@ -299,6 +299,7 @@ const char* choose_game()
 
 	gfxInitDefault();
 	consoleInit(GFX_TOP, nullptr);
+	trace("startup: picker");
 
 	auto drawn = -1;
 	auto is_chosen = false;
