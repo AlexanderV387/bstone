@@ -597,8 +597,15 @@ void filler_color_routine(
 
 CP_itemtype video_menu[] =
 {
+#ifdef __3DS__
+	// The 3DS always uses the software renderer at 400x240: the mode and
+	// texturing options (renderer, window, MSAA, filters...) do nothing.
+	{AT_DISABLED, "MODE", video_menu_mode_routine},
+	{AT_DISABLED, "TEXTURING", texturing_routine},
+#else
 	{AT_ENABLED, "MODE", video_menu_mode_routine},
 	{AT_ENABLED, "TEXTURING", texturing_routine},
+#endif
 	{AT_ENABLED, "WIDESCREEN", nullptr},
 	{AT_ENABLED, "STRETCH UI", nullptr},
 	{AT_ENABLED, "FILLER COLOR", filler_color_routine},

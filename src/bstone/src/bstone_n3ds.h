@@ -14,6 +14,8 @@ SPDX-License-Identifier: MIT
 
 #ifdef __3DS__
 
+#include <cstdint>
+
 namespace bstone {
 namespace n3ds {
 
@@ -37,6 +39,21 @@ void show_error(const char* message);
 // Turns button presses and releases into key events. Called after the SDL
 // events are polled (SDL reads the buttons with hidScanInput).
 void handle_buttons();
+
+// Top screen framebuffer: 400x240 RGBA8 pixels (0xRRGGBBAA), stored rotated:
+// screen pixel (x, y) is at [x * 240 + (239 - y)].
+std::uint32_t* get_top_framebuffer();
+
+// Shows the top framebuffer and waits for the vertical blank (SDL's
+// software renderer on the 3DS ignores vsync).
+void present_top_framebuffer();
+
+void wait_for_vblank();
+
+std::uint64_t get_milliseconds();
+
+// Counts a shown frame; the frames per second appear on the bottom screen.
+void count_frame();
 
 // Circle Pad: move and strafe. C-stick: turn.
 void poll_analog(int tics, bool is_running, int& control_x, int& control_y, int& strafe);

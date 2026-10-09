@@ -8,6 +8,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 // Software accelerated video (SW).
 
 #include <algorithm>
+#include <string>
 #include <utility>
 
 #include "3d_def.h"
@@ -23,6 +24,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "bstone_sw_video.h"
 #include "bstone_video.h"
 #include "bstone_video_cvars.h"
+#include "bstone_n3ds.h"
 
 #include "bstone_r3r_utils.h"
 
@@ -134,6 +136,25 @@ private:
 	void calculate_dimensions();
 	void uninitialize_vga_buffer() noexcept;
 	void update_palette_from_vga(int offset, int count);
+
+#ifdef __3DS__
+	// SDL's software renderer clears, scales and alpha-blends every layer
+	// with the CPU, then rotates the result into the framebuffer: too slow.
+	// On the 3DS the frame is composed in one buffer and copied, rotated,
+	// straight to the top screen.
+	std::vector<std::uint32_t> n3ds_frame_{};
+	std::array<std::uint32_t, 256> n3ds_colors_{};
+
+	void n3ds_present();
+	void n3ds_fill(const sys::Rectangle& rect, std::uint32_t color);
+	void n3ds_blit(
+		const std::uint8_t* src,
+		int src_width,
+		int src_height,
+		const sys::Rectangle* src_rect,
+		const sys::Rectangle& dst_rect,
+		const bool* mask);
+#endif
 
 private:
 	sys::VideoMgr& video_mgr_;
@@ -252,6 +273,11 @@ try {
 
 void SwVideo::vsync_present()
 try {
+#ifdef __3DS__
+	n3ds::wait_for_vblank();
+	return;
+#endif
+
 	// Clear all
 	//
 	renderer_->set_draw_color(opaque_black);
@@ -264,6 +290,11 @@ try {
 
 void SwVideo::present()
 try {
+#ifdef __3DS__
+	n3ds_present();
+	return;
+#endif
+
 	// HUD+3D stuff
 	//
 	if (vid_is_hud)
@@ -420,6 +451,188 @@ try {
 	//
 	renderer_->present();
 } BSTONE_END_FUNC_CATCH_ALL_THROW_NESTED
+
+#ifdef __3DS__
+namespace {
+
+constexpr auto n3ds_width = 400;
+constexpr auto n3ds_height = 240;
+
+// RGBA8 framebuffer word from a color.
+constexpr std::uint32_t n3ds_rgba(std::uint32_t r, std::uint32_t g, std::uint32_t b) noexcept
+{
+	return (r << 24) | (g << 16) | (b << 8) | 0xFFU;
+}
+
+} // namespace
+
+void SwVideo::n3ds_fill(const sys::Rectangle& rect, std::uint32_t color)
+{
+	const auto x0 = std::max(rect.x, 0);
+	const auto y0 = std::max(rect.y, 0);
+	const auto x1 = std::min(rect.x + rect.width, n3ds_width);
+	const auto y1 = std::min(rect.y + rect.height, n3ds_height);
+
+	for (auto y = y0; y < y1; ++y)
+	{
+		std::fill(&n3ds_frame_[y * n3ds_width + x0], &n3ds_frame_[y * n3ds_width + x1], color);
+	}
+}
+
+// Nearest-neighbor scaled copy; with a mask, only the pixels it marks.
+void SwVideo::n3ds_blit(
+	const std::uint8_t* src,
+	int src_width,
+	int src_height,
+	const sys::Rectangle* src_rect,
+	const sys::Rectangle& dst_rect,
+	const bool* mask)
+{
+	const auto sr = src_rect != nullptr ? *src_rect : sys::Rectangle{0, 0, src_width, src_height};
+
+	if (sr.width <= 0 || sr.height <= 0 || dst_rect.width <= 0 || dst_rect.height <= 0)
+	{
+		return;
+	}
+
+	const auto x0 = std::max(dst_rect.x, 0);
+	const auto y0 = std::max(dst_rect.y, 0);
+	const auto x1 = std::min(dst_rect.x + dst_rect.width, n3ds_width);
+	const auto y1 = std::min(dst_rect.y + dst_rect.height, n3ds_height);
+
+	int src_xs[n3ds_width];
+
+	for (auto x = x0; x < x1; ++x)
+	{
+		src_xs[x] = sr.x + ((x - dst_rect.x) * sr.width) / dst_rect.width;
+	}
+
+	for (auto y = y0; y < y1; ++y)
+	{
+		const auto src_y = sr.y + ((y - dst_rect.y) * sr.height) / dst_rect.height;
+		const auto src_line = &src[src_y * src_width];
+		const auto mask_line = mask != nullptr ? &mask[src_y * src_width] : nullptr;
+		auto dst_line = &n3ds_frame_[y * n3ds_width];
+
+		if (mask_line == nullptr)
+		{
+			for (auto x = x0; x < x1; ++x)
+			{
+				dst_line[x] = n3ds_colors_[src_line[src_xs[x]]];
+			}
+		}
+		else
+		{
+			for (auto x = x0; x < x1; ++x)
+			{
+				const auto src_x = src_xs[x];
+
+				if (mask_line[src_x])
+				{
+					dst_line[x] = n3ds_colors_[src_line[src_x]];
+				}
+			}
+		}
+	}
+}
+
+// The same layers and rectangles as present(), without SDL.
+void SwVideo::n3ds_present()
+{
+	n3ds_frame_.resize(n3ds_width * n3ds_height);
+
+	for (auto i = 0; i < 256; ++i)
+	{
+		const auto color = palette_[i]; // 0xAARRGGBB
+		n3ds_colors_[i] = n3ds_rgba((color >> 16) & 0xFFU, (color >> 8) & 0xFFU, color & 0xFFU);
+	}
+
+	const auto black = n3ds_rgba(0, 0, 0);
+	std::fill(n3ds_frame_.begin(), n3ds_frame_.end(), black);
+
+	// HUD+3D stuff
+	//
+	if (vid_is_hud)
+	{
+		n3ds_blit(sw_vga_buffer_.data(), vga_width, vga_height, nullptr, screen_dst_rect_, nullptr);
+	}
+
+	// 2D stuff (in HUD mode only where the mask marks the UI)
+	//
+	const auto ui = vid_ui_buffer_.data();
+	const auto mask = vid_is_hud ? vid_mask_buffer_.data() : nullptr;
+
+	const auto is_stretched = vid_cfg_is_ui_stretched();
+	const auto is_widescreen = vid_cfg_is_widescreen();
+
+	const auto is_top_wide = is_stretched;
+	const auto is_middle_wide = (vid_is_hud && is_widescreen) || (!vid_is_hud && is_stretched);
+	const auto is_bottom_wide = is_stretched;
+
+	if (is_top_wide && is_middle_wide && is_bottom_wide)
+	{
+		n3ds_blit(ui, vga_ref_width, vga_ref_height, nullptr, ui_wide_dst_rect_, mask);
+	}
+	else if (!is_top_wide && !is_middle_wide && !is_bottom_wide)
+	{
+		n3ds_blit(ui, vga_ref_width, vga_ref_height, nullptr, ui_4x3_dst_rect_, mask);
+	}
+	else
+	{
+		const auto& dst_top_rect = is_top_wide ? ui_wide_top_dst_rect_ : ui_4x3_top_dst_rect_;
+		const auto& dst_middle_rect = is_middle_wide ? ui_wide_middle_dst_rect_ : ui_4x3_middle_dst_rect_;
+		const auto& dst_bottom_rect = is_bottom_wide ? ui_wide_bottom_dst_rect_ : ui_4x3_bottom_dst_rect_;
+
+		n3ds_blit(ui, vga_ref_width, vga_ref_height, &ui_top_src_rect_, dst_top_rect, mask);
+		n3ds_blit(ui, vga_ref_width, vga_ref_height, &ui_middle_src_rect_, dst_middle_rect, mask);
+		n3ds_blit(ui, vga_ref_width, vga_ref_height, &ui_bottom_src_rect_, dst_bottom_rect, mask);
+	}
+
+	// Filler
+	//
+	if (!is_stretched)
+	{
+		const auto fill_color = vid_is_movie ?
+			black :
+			n3ds_rgba(filler_color_.r, filler_color_.g, filler_color_.b);
+
+		if (vid_is_hud)
+		{
+			for (const auto& rect : filler_hud_rects_)
+			{
+				n3ds_fill(rect, fill_color);
+			}
+		}
+		else
+		{
+			for (const auto& rect : filler_ui_rects_)
+			{
+				n3ds_fill(rect, fill_color);
+			}
+		}
+	}
+
+	n3ds::count_frame();
+
+	// Rotated copy: screen column x is framebuffer row x, bottom to top.
+	//
+	const auto framebuffer = n3ds::get_top_framebuffer();
+
+	for (auto x = 0; x < n3ds_width; ++x)
+	{
+		auto dst = &framebuffer[x * n3ds_height + (n3ds_height - 1)];
+		auto src = &n3ds_frame_[x];
+
+		for (auto y = 0; y < n3ds_height; ++y)
+		{
+			*dst-- = *src;
+			src += n3ds_width;
+		}
+	}
+
+	n3ds::present_top_framebuffer();
+}
+#endif // __3DS__
 
 void SwVideo::get_palette(int offset, int count, std::uint8_t* vga_palette) const
 try {

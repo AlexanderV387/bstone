@@ -229,6 +229,102 @@ void handle_buttons()
 	}
 }
 
+std::uint32_t* get_top_framebuffer()
+{
+	return reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_TOP, GFX_LEFT, nullptr, nullptr));
+}
+
+void present_top_framebuffer()
+{
+	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * 240 * 4);
+	gfxScreenSwapBuffers(GFX_TOP, false);
+	gspWaitForVBlank();
+}
+
+void wait_for_vblank()
+{
+	gspWaitForVBlank();
+}
+
+std::uint64_t get_milliseconds()
+{
+	return osGetTime();
+}
+
+namespace {
+
+// Bottom screen: 320x240 RGBA8, rotated like the top one.
+void fill_bottom(std::uint32_t* framebuffer, int x, int y, int width, int height, std::uint32_t color)
+{
+	for (auto i = x; i < x + width; ++i)
+	{
+		for (auto j = y; j < y + height; ++j)
+		{
+			framebuffer[i * 240 + (239 - j)] = color;
+		}
+	}
+}
+
+// 3x5 digits, as in the n3ds-ports hello world.
+void draw_number(std::uint32_t* framebuffer, int number, int x, int y, int scale, std::uint32_t color)
+{
+	static constexpr std::uint8_t digits[10][5] =
+	{
+		{7, 5, 5, 5, 7}, {2, 6, 2, 2, 7}, {7, 1, 7, 4, 7}, {7, 1, 7, 1, 7}, {5, 5, 7, 1, 1},
+		{7, 4, 7, 1, 7}, {7, 4, 7, 5, 7}, {7, 1, 1, 1, 1}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 7},
+	};
+
+	char text[12];
+	std::snprintf(text, sizeof(text), "%d", number);
+
+	for (auto i = 0; text[i] != '\0'; ++i)
+	{
+		const auto& digit = digits[text[i] - '0'];
+
+		for (auto row = 0; row < 5; ++row)
+		{
+			for (auto col = 0; col < 3; ++col)
+			{
+				if ((digit[row] & (4 >> col)) != 0)
+				{
+					fill_bottom(framebuffer, x + (i * 4 + col) * scale, y + row * scale, scale, scale, color);
+				}
+			}
+		}
+	}
+}
+
+int frame_count_ = 0;
+std::uint64_t fps_time_ = 0;
+
+} // namespace
+
+void count_frame()
+{
+	++frame_count_;
+
+	const auto now = osGetTime();
+	const auto elapsed = now - fps_time_;
+
+	if (elapsed < 1000)
+	{
+		return;
+	}
+
+	const auto fps = static_cast<int>((frame_count_ * 1000) / elapsed);
+	const auto frame_ms = frame_count_ > 0 ? static_cast<int>(elapsed / frame_count_) : 0;
+	frame_count_ = 0;
+	fps_time_ = now;
+
+	// Frames per second (big) and milliseconds per frame (small).
+	const auto framebuffer = reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, nullptr, nullptr));
+	fill_bottom(framebuffer, 0, 0, 320, 240, 0x000000FFU);
+	draw_number(framebuffer, fps, 40, 60, 16, 0xFFFFFFFFU);
+	draw_number(framebuffer, frame_ms, 40, 170, 6, 0x80FF80FFU);
+	GSPGPU_FlushDataCache(framebuffer, 320 * 240 * 4);
+	gfxScreenSwapBuffers(GFX_BOTTOM, false);
+}
+
 void poll_analog(int tics, bool is_running, int& control_x, int& control_y, int& strafe)
 {
 	// Proportional to the tilt and to the time: the stick fully pushed

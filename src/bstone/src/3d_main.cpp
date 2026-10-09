@@ -10064,13 +10064,34 @@ int main(
 		error_message = bstone::get_nested_message();
 	}
 
+#ifdef __3DS__
+	// Shutdown timing: closing takes long on the 3DS.
+	const auto n3ds_quit_time = bstone::n3ds::get_milliseconds();
+	const auto n3ds_log_time = [n3ds_quit_time](const char* step)
+	{
+		const auto ms = bstone::n3ds::get_milliseconds() - n3ds_quit_time;
+		bstone::globals::logger->log_information(
+			(std::string{"[3DS] "} + step + ": " + std::to_string(ms) + " ms").c_str());
+	};
+
+	n3ds_log_time("quit");
+#endif
+
 	pre_quit();
+
+#ifdef __3DS__
+	n3ds_log_time("pre_quit done");
+#endif
 
 	bstone::globals::sys_mouse_mgr = nullptr;
 	bstone::globals::sys_window_mgr = nullptr;
 	bstone::globals::sys_video_mgr = nullptr;
 	bstone::globals::sys_event_mgr = nullptr;
 	bstone::globals::sys_system_mgr = nullptr;
+
+#ifdef __3DS__
+	n3ds_log_time("system shut down");
+#endif
 
 	if (is_failed)
 	{
