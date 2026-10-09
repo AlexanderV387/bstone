@@ -187,6 +187,147 @@ void show_error(const char* message)
 	gfxExit();
 }
 
+namespace {
+
+struct GameChoice
+{
+	const char* name;
+	const char* data_file;
+	const char* option;
+};
+
+constexpr GameChoice game_choices[] =
+{
+	{"Aliens of Gold", "sdmc:/3ds/bstone/vswap.bs6", "--aog"},
+	{"Aliens of Gold (shareware)", "sdmc:/3ds/bstone/vswap.bs1", "--aog_sw"},
+	{"Planet Strike", "sdmc:/3ds/bstone/vswap.vsi", "--ps"},
+};
+
+constexpr auto game_choice_count = static_cast<int>(sizeof(game_choices) / sizeof(game_choices[0]));
+constexpr auto last_game_path = "sdmc:/3ds/bstone/last-game.txt";
+
+bool file_exists(const char* path)
+{
+	const auto file = std::fopen(path, "rb");
+
+	if (file == nullptr)
+	{
+		return false;
+	}
+
+	std::fclose(file);
+	return true;
+}
+
+} // namespace
+
+const char* choose_game()
+{
+	int available[game_choice_count];
+	auto count = 0;
+
+	for (auto i = 0; i < game_choice_count; ++i)
+	{
+		if (file_exists(game_choices[i].data_file))
+		{
+			available[count++] = i;
+		}
+	}
+
+	if (count <= 1)
+	{
+		return nullptr; // BStone finds the game (or reports that there is none)
+	}
+
+	// Start on the last game played.
+	auto selected = 0;
+	auto last_game = -1;
+
+	if (const auto file = std::fopen(last_game_path, "r"))
+	{
+		if (std::fscanf(file, "%d", &last_game) != 1)
+		{
+			last_game = -1;
+		}
+
+		std::fclose(file);
+	}
+
+	for (auto i = 0; i < count; ++i)
+	{
+		if (available[i] == last_game)
+		{
+			selected = i;
+		}
+	}
+
+	gfxInitDefault();
+	consoleInit(GFX_TOP, nullptr);
+
+	auto drawn = -1;
+	auto is_chosen = false;
+
+	while (aptMainLoop())
+	{
+		hidScanInput();
+		const auto down = hidKeysDown();
+
+		if ((down & (KEY_DOWN | KEY_CPAD_DOWN)) != 0)
+		{
+			selected = (selected + 1) % count;
+		}
+
+		if ((down & (KEY_UP | KEY_CPAD_UP)) != 0)
+		{
+			selected = (selected + count - 1) % count;
+		}
+
+		if ((down & KEY_A) != 0)
+		{
+			is_chosen = true;
+			break;
+		}
+
+		if ((down & KEY_START) != 0)
+		{
+			break;
+		}
+
+		if (selected != drawn)
+		{
+			consoleClear();
+			std::printf("\n  BLAKE STONE\n\n  Choose a game:\n\n");
+
+			for (auto i = 0; i < count; ++i)
+			{
+				std::printf("  %s %s\n\n", i == selected ? ">" : " ", game_choices[available[i]].name);
+			}
+
+			std::printf("\n  Up/Down: choose  A: start\n  START: back to the menu\n");
+			drawn = selected;
+		}
+
+		gspWaitForVBlank();
+	}
+
+	gfxExit(); // SDL sets the screens up again
+
+	if (!is_chosen)
+	{
+		std::exit(0);
+	}
+
+	const auto game = available[selected];
+
+	if (const auto file = std::fopen(last_game_path, "w"))
+	{
+		std::fprintf(file, "%d\n", game);
+		std::fclose(file);
+	}
+
+	return game_choices[game].option;
+}
+
 bool is_game_mode() noexcept
 {
 	return is_game_mode_;

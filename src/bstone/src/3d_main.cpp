@@ -15,6 +15,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include <iterator>
 #include <stdexcept>
 #include <thread>
+#include <vector>
 #include "3d_def.h"
 #include "jm_lzh.h"
 #include "jm_tp.h"
@@ -9964,6 +9965,18 @@ int main(
 {
 #ifdef __3DS__
 	bstone::n3ds::initialize();
+
+	// More than one game in the data folder: choose here (BStone would ask
+	// with a message box).
+	std::vector<char*> n3ds_args(argv, argv + argc);
+
+	if (const auto option = bstone::n3ds::choose_game())
+	{
+		n3ds_args.push_back(const_cast<char*>(option));
+	}
+
+	argc = static_cast<int>(n3ds_args.size());
+	argv = n3ds_args.data();
 #endif
 
 #ifdef __vita__

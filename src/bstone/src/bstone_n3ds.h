@@ -25,6 +25,13 @@ namespace n3ds {
 // What SDL's own 3DS main would do: 804 MHz on the New 3DS.
 void initialize();
 
+// When the data folder holds more than one game (*.BS1, *.BS6, *.VSI), a
+// text menu on the top screen chooses one before SDL starts (BStone asks
+// with a message box, which the 3DS does not have). Returns the option for
+// it (--aog_sw, --aog or --ps), or nullptr when there is nothing to choose.
+// START in the menu exits.
+const char* choose_game();
+
 // Menus (the default): A is Enter and Yes, B is Escape and No, X is Delete,
 // L and R are Page Up and Page Down, the Circle Pad moves like the D-pad.
 // In game every button is only its own bindable scan code.
