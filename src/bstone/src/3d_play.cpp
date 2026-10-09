@@ -17,6 +17,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "id_vh.h"
 #include "id_vl.h"
 #include "3d_menu.h"
+#include "bstone_n3ds.h"
 #include "gfxv.h"
 #include "bstone_scope_exit.h"
 
@@ -622,6 +623,15 @@ void PollControls()
 	// get movements
 	//
 	PollKeyboardMove();
+
+#ifdef __3DS__
+	bstone::n3ds::poll_analog(
+		tics,
+		in_is_binding_pressed(e_bi_run) != gp_is_always_run(),
+		controlx,
+		controly,
+		strafe_value);
+#endif
 
 	if (in_is_mouse_enabled())
 	{
@@ -2007,6 +2017,16 @@ void PlayLoop()
 {
 	bool reset_areas = false;
 	objtype* obj;
+
+#ifdef __3DS__
+	bstone::n3ds::set_game_mode(true);
+
+	const auto n3ds_guard = bstone::make_scope_exit(
+		[]()
+		{
+			bstone::n3ds::set_game_mode(false);
+		});
+#endif
 
 	lasttimecount = 0;
 	TimeCount = 0;

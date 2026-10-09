@@ -8,11 +8,33 @@ SPDX-License-Identifier: MIT
 
 #include "bstone_shared_library.h"
 
+#ifndef __3DS__
 #include <dlfcn.h>
+#endif
 
 #include "bstone_exception.h"
 
 namespace bstone {
+
+#ifdef __3DS__
+
+// No shared libraries on the 3DS: OpenAL, OpenGL and Vulkan are never found
+// and BStone falls back to its own mixer and the software renderer.
+
+void SharedLibraryHandleDeleter::operator()(void*) const noexcept {}
+
+bool SharedLibrary::try_open(const char*)
+{
+	close();
+	return false;
+}
+
+void* SharedLibrary::find_symbol(const char*) const noexcept
+{
+	return nullptr;
+}
+
+#else
 
 void SharedLibraryHandleDeleter::operator()(void* handle) const noexcept
 {
@@ -40,6 +62,8 @@ void* SharedLibrary::find_symbol(const char* symbol_name) const noexcept
 {
 	return dlsym(handle_.get(), symbol_name);
 }
+
+#endif // __3DS__
 
 } // namespace bstone
 

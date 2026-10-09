@@ -28,6 +28,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "id_ca.h"
 #include "id_heads.h"
 #include "id_in.h"
+#include "bstone_n3ds.h"
 #include "id_sd.h"
 #include "id_vl.h"
 #include "bstone_ascii.h"
@@ -130,7 +131,11 @@ namespace {
 // in_is_mouse_enabled
 
 constexpr auto in_is_mouse_enabled_cvar_name = bstone::StringView{"in_is_mouse_enabled"};
+#ifdef __3DS__
+constexpr auto in_is_mouse_enabled_cvar_default = false; // the touch screen is not a mouse
+#else
 constexpr auto in_is_mouse_enabled_cvar_default = true;
+#endif
 
 auto in_is_mouse_enabled_cvar = bstone::CVar{
 	bstone::CVarBoolTag{},
@@ -862,6 +867,10 @@ void in_handle_events()
 	{
 		vid_schedule_take_screenshot();
 	}
+
+#ifdef __3DS__
+	bstone::n3ds::handle_buttons();
+#endif
 }
 
 //
@@ -1265,6 +1274,24 @@ void in_set_default_bindings()
 	in_bindings[e_bi_grab_mouse][0] = ScanCode::sc_u;
 
 	in_bindings[e_bi_take_screenshot][0] = ScanCode::sc_f5;
+
+#ifdef __3DS__
+	// R fires, as in most FPS. The D-pad also moves and turns.
+	in_bindings[e_bi_forward][1] = ScanCode::sc_up_arrow;
+	in_bindings[e_bi_backward][1] = ScanCode::sc_down_arrow;
+	in_bindings[e_bi_attack][0] = ScanCode::sc_n3ds_r;
+	in_bindings[e_bi_attack][1] = ScanCode::sc_n3ds_zr;
+	in_bindings[e_bi_use][0] = ScanCode::sc_n3ds_a;
+	in_bindings[e_bi_use][1] = ScanCode::sc_none;
+	in_bindings[e_bi_run][0] = ScanCode::sc_n3ds_b;
+	in_bindings[e_bi_run][1] = ScanCode::sc_n3ds_zl;
+	in_bindings[e_bi_strafe][0] = ScanCode::sc_n3ds_l;
+	in_bindings[e_bi_cycle_next_weapon][0] = ScanCode::sc_n3ds_x;
+	in_bindings[e_bi_cycle_next_weapon][1] = ScanCode::sc_none;
+	in_bindings[e_bi_cycle_previous_weapon][0] = ScanCode::sc_n3ds_y;
+	in_bindings[e_bi_cycle_previous_weapon][1] = ScanCode::sc_none;
+	in_bindings[e_bi_pause][0] = ScanCode::sc_n3ds_select;
+#endif
 }
 
 bool in_is_binding_pressed(BindingId binding_id)
@@ -1635,6 +1662,16 @@ constexpr auto in_mouse_x2_sv = bstone::StringView{"mouse_x2"};
 constexpr auto in_mouse_wheel_down_sv = bstone::StringView{"mouse_wheel_down"};
 constexpr auto in_mouse_wheel_up_sv = bstone::StringView{"mouse_wheel_up"};
 
+constexpr auto in_n3ds_a_sv = bstone::StringView{"3ds_a"};
+constexpr auto in_n3ds_b_sv = bstone::StringView{"3ds_b"};
+constexpr auto in_n3ds_x_sv = bstone::StringView{"3ds_x"};
+constexpr auto in_n3ds_y_sv = bstone::StringView{"3ds_y"};
+constexpr auto in_n3ds_l_sv = bstone::StringView{"3ds_l"};
+constexpr auto in_n3ds_r_sv = bstone::StringView{"3ds_r"};
+constexpr auto in_n3ds_zl_sv = bstone::StringView{"3ds_zl"};
+constexpr auto in_n3ds_zr_sv = bstone::StringView{"3ds_zr"};
+constexpr auto in_n3ds_select_sv = bstone::StringView{"3ds_select"};
+
 struct InScanCodeNameToIdMapItem
 {
 	const bstone::StringView& name_sv;
@@ -1740,6 +1777,16 @@ constexpr InScanCodeNameToIdMapItem in_scan_code_name_to_id_map[] =
 
 	{in_mouse_wheel_down_sv, ScanCode::sc_mouse_wheel_down},
 	{in_mouse_wheel_up_sv, ScanCode::sc_mouse_wheel_up},
+
+	{in_n3ds_a_sv, ScanCode::sc_n3ds_a},
+	{in_n3ds_b_sv, ScanCode::sc_n3ds_b},
+	{in_n3ds_x_sv, ScanCode::sc_n3ds_x},
+	{in_n3ds_y_sv, ScanCode::sc_n3ds_y},
+	{in_n3ds_l_sv, ScanCode::sc_n3ds_l},
+	{in_n3ds_r_sv, ScanCode::sc_n3ds_r},
+	{in_n3ds_zl_sv, ScanCode::sc_n3ds_zl},
+	{in_n3ds_zr_sv, ScanCode::sc_n3ds_zr},
+	{in_n3ds_select_sv, ScanCode::sc_n3ds_select},
 };
 
 ScanCode in_scan_code_name_to_id(bstone::StringView name_sv)

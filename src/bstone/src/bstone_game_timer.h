@@ -49,6 +49,18 @@ private:
 	using MtTicks = std::atomic<GameTimerTicks>;
 	using Thread = std::thread;
 
+#ifdef __3DS__
+	// On the 3DS, threads on the same core do not preempt each other, so a
+	// ticker thread may never run while the game loop is busy. The ticks are
+	// computed from the elapsed time instead.
+	bool is_started_{};
+	int frequency_{};
+	Clock::time_point start_time_{};
+	GameTimerTicks offset_{};
+
+	GameTimerTicks get_elapsed_ticks() const;
+#endif // __3DS__
+
 private:
 	AtomicFlag mt_is_cancellation_requested_{};
 	MtTicks mt_ticks_{};

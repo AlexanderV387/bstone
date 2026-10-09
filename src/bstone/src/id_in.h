@@ -139,6 +139,18 @@ enum class ScanCode
 
 	sc_mouse_wheel_down = 0x69,
 	sc_mouse_wheel_up = 0x6A,
+
+	// 3DS buttons (bindable like keys). START and the D-pad are not: START
+	// is Escape, the D-pad gives the arrow keys.
+	sc_n3ds_a = 0x70,
+	sc_n3ds_b = 0x71,
+	sc_n3ds_x = 0x72,
+	sc_n3ds_y = 0x73,
+	sc_n3ds_l = 0x74,
+	sc_n3ds_r = 0x75,
+	sc_n3ds_zl = 0x76,
+	sc_n3ds_zr = 0x77,
+	sc_n3ds_select = 0x78,
 };
 
 #define key_None 0

@@ -95,7 +95,14 @@ bool file_posix_lock_fcntl(int handle, int fcntl_op, short lock_type)
 	return fcntl(handle, fcntl_op, &posix_flock) == 0;
 }
 
-#ifndef F_OFD_SETLK
+#if defined(__3DS__)
+// The 3DS SD card has no file locks; only this process uses the files.
+
+bool file_posix_lock_flock(int, short)
+{
+	return true;
+}
+#elif !defined(F_OFD_SETLK)
 bool file_posix_lock_flock(int handle, short lock_type)
 {
 	return flock(handle, lock_type | LOCK_NB) == 0;

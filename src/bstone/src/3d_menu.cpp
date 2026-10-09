@@ -22,6 +22,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "id_vh.h"
 #include "id_vl.h"
 #include "3d_menu.h"
+#include "bstone_n3ds.h"
 #include "gfxv.h"
 #include "jm_cio.h"
 #include "jm_lzh.h"
@@ -1084,6 +1085,24 @@ void binds_initialize_menu()
 	binds_names[ScanCode::sc_mouse_wheel_down] = "MWHEEL DOWN";
 	binds_names[ScanCode::sc_mouse_wheel_up] = "MWHEEL UP";
 
+#ifdef __3DS__
+	// Only what the 3DS has: its buttons and the D-pad.
+	binds_names.clear();
+	binds_names[ScanCode::sc_n3ds_a] = "A";
+	binds_names[ScanCode::sc_n3ds_b] = "B";
+	binds_names[ScanCode::sc_n3ds_x] = "X";
+	binds_names[ScanCode::sc_n3ds_y] = "Y";
+	binds_names[ScanCode::sc_n3ds_l] = "L";
+	binds_names[ScanCode::sc_n3ds_r] = "R";
+	binds_names[ScanCode::sc_n3ds_zl] = "ZL";
+	binds_names[ScanCode::sc_n3ds_zr] = "ZR";
+	binds_names[ScanCode::sc_n3ds_select] = "SELECT";
+	binds_names[ScanCode::sc_up_arrow] = "UP";
+	binds_names[ScanCode::sc_down_arrow] = "DOWN";
+	binds_names[ScanCode::sc_left_arrow] = "LEFT";
+	binds_names[ScanCode::sc_right_arrow] = "RIGHT";
+#endif
+
 	for (const auto& binds_name : binds_names)
 	{
 		int width = 0;
@@ -1424,6 +1443,16 @@ void binds_draw_menu()
 
 		if (binds_is_assigning)
 		{
+#ifdef __3DS__
+			bstone::n3ds::set_assigning(true);
+
+			const auto assigning_guard = bstone::make_scope_exit(
+				[]()
+				{
+					bstone::n3ds::set_assigning(false);
+				});
+#endif
+
 			LastScan = ScanCode::sc_none;
 			bool quit = false;
 
@@ -1760,6 +1789,17 @@ void US_ControlPanel(
 			is_full_menu_active = false;
 			sd_pause_scene_sfx(false);
 		});
+
+#ifdef __3DS__
+	const auto was_game_mode = bstone::n3ds::is_game_mode();
+	bstone::n3ds::set_game_mode(false);
+
+	const auto n3ds_guard = bstone::make_scope_exit(
+		[was_game_mode]()
+		{
+			bstone::n3ds::set_game_mode(was_game_mode);
+		});
+#endif
 
 	// BBi
 	const auto& assets_info = get_assets_info();

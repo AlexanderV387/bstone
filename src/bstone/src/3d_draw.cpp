@@ -1502,7 +1502,7 @@ void CalcTics()
 	realtics = tics;
 	if (tics > MAXTICS)
 	{
-		TimeCount = std::max(TimeCount - (tics - MAXTICS), 0);
+		TimeCount = std::max(TimeCount - (tics - MAXTICS), bstone::GameTimerTicks{0});
 		tics = MAXTICS;
 	}
 }

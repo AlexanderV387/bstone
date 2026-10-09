@@ -2,3 +2,4 @@ build/
 .vscode/
 .vs/
 .DS_Store
+build-3ds/

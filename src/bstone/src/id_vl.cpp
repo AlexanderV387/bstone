@@ -1775,6 +1775,11 @@ try {
 
 bstone::RendererType vid_cfg_get_renderer_type() noexcept
 {
+#ifdef __3DS__
+	// No OpenGL or Vulkan on the 3DS.
+	return bstone::RendererType::software;
+#endif
+
 	const auto renderer_sv = vid_renderer_cvar.get_string();
 
 #ifndef NDEBUG
@@ -1898,6 +1903,10 @@ int vid_cfg_get_y() noexcept
 
 int vid_cfg_get_width() noexcept
 {
+#ifdef __3DS__
+	return 400; // top screen
+#endif
+
 	return vid_width_cvar.get_int32();
 }
 
@@ -1908,6 +1917,10 @@ void vid_cfg_set_width(int width)
 
 int vid_cfg_get_height() noexcept
 {
+#ifdef __3DS__
+	return 240;
+#endif
+
 	return vid_height_cvar.get_int32();
 }
 
@@ -1928,6 +1941,10 @@ void vid_cfg_set_refresh_rate(int refresh_rate)
 
 WindowMode vid_cfg_get_window_mode()
 {
+#ifdef __3DS__
+	return WindowMode::windowed;
+#endif
+
 	const bstone::StringView window_mode_string_view = bstone::vid_window_mode_cvar.get_string();
 
 	if (window_mode_string_view == bstone::vid_window_mode_cvar_fullscreen)

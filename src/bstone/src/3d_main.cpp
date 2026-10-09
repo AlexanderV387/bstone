@@ -24,6 +24,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "id_us.h"
 #include "id_vh.h"
 #include "3d_menu.h"
+#include "bstone_n3ds.h"
 #include "bstone_archiver.h"
 #include "bstone_ascii.h"
 #include "bstone_assert.h"
@@ -9932,6 +9933,10 @@ int main(
 	int argc,
 	char* argv[])
 {
+#ifdef __3DS__
+	bstone::n3ds::initialize();
+#endif
+
 #ifdef __vita__
 	scePowerSetArmClockFrequency(444);
 	scePowerSetBusClockFrequency(222);
@@ -9975,7 +9980,12 @@ int main(
 	const auto& log_file_path = profile_dir + "bstone_log.txt";
 
 	auto logger_open_param = bstone::LoggerOpenParam{};
+#ifdef __3DS__
+	// No logger thread: on the 3DS it would only run when the game sleeps.
+	logger_open_param.is_synchronous = true;
+#else
 	logger_open_param.is_synchronous = opt_is_log_sync;
+#endif
 	logger_open_param.flush_policy =
 		opt_is_log_flush_every_message ?
 		bstone::LoggerFlushPolicy::every_message :
@@ -10843,6 +10853,10 @@ const std::string& get_default_data_dir()
 
 		result = bstone::fs_utils::get_working_dir();
 
+#ifdef __3DS__
+		result = "sdmc:/3ds/bstone/";
+#endif
+
 #ifdef __vita__
 		result = "ux0:/data/bstone/";
 #endif
@@ -10965,7 +10979,11 @@ auto gp_hide_attacker_info_cvar = bstone::CVar{
 // gp_is_always_run
 
 constexpr auto gp_is_always_run_cvar_name = bstone::StringView{"gp_is_always_run"};
+#ifdef __3DS__
+constexpr auto gp_is_always_run_cvar_default = false; // the run button runs
+#else
 constexpr auto gp_is_always_run_cvar_default = true;
+#endif
 
 auto gp_is_always_run_cvar = bstone::CVar{
 	bstone::CVarBoolTag{},

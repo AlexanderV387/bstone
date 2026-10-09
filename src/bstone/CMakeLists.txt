@@ -123,11 +123,14 @@ if(BSTONE_VULKAN_COMPILE_SHADERS)
 	add_dependencies(bstone bstone_vulkan_compile_shaders)
 endif()
 
-add_custom_command(
-	TARGET bstone POST_BUILD
-	COMMAND $<$<CONFIG:RELEASE>:${CMAKE_STRIP}> $<$<CONFIG:RELEASE>:$<TARGET_FILE:bstone>>
-	VERBATIM
-)
+# 3dsxtool and makerom need the symbols; the .3dsx and .cia carry none.
+if (NOT NINTENDO_3DS)
+	add_custom_command(
+		TARGET bstone POST_BUILD
+		COMMAND $<$<CONFIG:RELEASE>:${CMAKE_STRIP}> $<$<CONFIG:RELEASE>:$<TARGET_FILE:bstone>>
+		VERBATIM
+	)
+endif ()
 
 if (BSTONE_TRIM_FILE_PATHS_IN_EXE)
 	add_dependencies(bstone bstone_ltrimcs)
@@ -165,6 +168,13 @@ set_target_properties(bstone PROPERTIES
 	CXX_STANDARD_REQUIRED ON
 	CXX_EXTENSIONS OFF
 )
+
+if (NINTENDO_3DS)
+	# newlib only declares POSIX functions such as ftruncate in GNU mode.
+	set_target_properties(bstone PROPERTIES
+		CXX_EXTENSIONS ON
+	)
+endif ()
 
 if (WIN32)
 	set_target_properties(bstone PROPERTIES
@@ -267,7 +277,7 @@ endif ()
 
 target_link_libraries(bstone
 	PRIVATE
-		${CMAKE_DL_LIBS}
+		$<$<NOT:$<BOOL:${NINTENDO_3DS}>>:${CMAKE_DL_LIBS}>
 		$<$<BOOL:${BSTONE_INTERNAL_SDL2}>:SDL2::SDL2-static>
 		$<$<NOT:$<BOOL:${BSTONE_INTERNAL_SDL2}>>:SDL2W::SDL2W>
 		$<$<BOOL:${WIN32}>:wbemuuid>
@@ -279,6 +289,19 @@ target_link_libraries(bstone
 		bstone::lib::xbrz
 		bstone::vulkan
 )
+
+if (NINTENDO_3DS)
+	ctr_generate_smdh(${PROJECT_BINARY_DIR}/bstone.smdh
+		NAME "BStone"
+		DESCRIPTION "Blake Stone: Aliens of Gold / Planet Strike"
+		AUTHOR "AlexanderV387, bibendovsky"
+		ICON ${PROJECT_SOURCE_DIR}/../../n3ds/icon.png
+	)
+
+	ctr_create_3dsx(bstone
+		SMDH ${PROJECT_BINARY_DIR}/bstone.smdh
+	)
+endif ()
 
 if (BSTONE_PANDORA)
 	target_link_libraries(bstone
@@ -436,6 +459,8 @@ set(BSTONE_LIB_MISC_SOURCES
 	src/bstone_endian.cpp
 	src/bstone_endian.h
 	src/bstone_entry_point.cpp
+	src/bstone_n3ds.cpp
+	src/bstone_n3ds.h
 	src/bstone_entry_point.h
 	src/bstone_enum_flags.h
 	src/bstone_exception.cpp

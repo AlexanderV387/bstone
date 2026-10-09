@@ -6,7 +6,7 @@ SPDX-License-Identifier: MIT
 
 // Process utils.
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__3DS__)
 
 //#define BSTONE_PROCESS_DEBUG
 
@@ -549,3 +549,28 @@ void open_file_or_url(const char* url_utf8)
 } // namespace bstone
 
 #endif // _WIN32
+
+#ifdef __3DS__
+
+// The 3DS cannot start other programs or open URLs.
+
+#include "bstone_process.h"
+#include "bstone_exception.h"
+
+namespace bstone {
+namespace process {
+
+CreateAndWaitForExitResult create_and_wait_for_exit(const CreateAndWaitForExitParam&)
+{
+	BSTONE_THROW_STATIC_SOURCE("Not supported on the 3DS.");
+}
+
+void open_file_or_url(const char*)
+{
+	BSTONE_THROW_STATIC_SOURCE("Not supported on the 3DS.");
+}
+
+} // namespace process
+} // namespace bstone
+
+#endif // __3DS__

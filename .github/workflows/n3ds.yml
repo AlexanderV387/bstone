@@ -1,0 +1,91 @@
+name: n3ds
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build
+        run: |
+          cmake -S . -B build-3ds \
+            -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/3DS.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBSTONE_INTERNAL_SDL2=ON \
+            -DBSTONE_CI_GIT_HASH="${{ github.sha }}"
+          cmake --build build-3ds -j"$(nproc)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bstone-3dsx
+          path: build-3ds/src/bstone/bstone.3dsx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elf
+          path: build-3ds/src/bstone/bstone.elf
+
+  cia:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: elf
+
+      - name: Install makerom and bannertool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: tools/3ds/install-tools.sh
+
+      - name: Make CIA
+        run: |
+          tools/3ds/make-cia.sh bstone.elf bstone.cia \
+            "BStone" "Blake Stone: Aliens of Gold / Planet Strike" "AlexanderV387, bibendovsky" \
+            0xF3D55 CTR-H-BSTN \
+            n3ds/icon.png n3ds/banner.png n3ds/banner.wav
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bstone-cia
+          path: bstone.cia
+
+  release:
+    # A commit on n3ds whose message contains [release] publishes a GitHub
+    # release tagged v<n3ds/VERSION> with the .3dsx and the .cia.
+    if: github.ref == 'refs/heads/n3ds' && contains(github.event.head_commit.message, '[release]')
+    needs: [build, cia]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bstone-*
+          path: dist
+          merge-multiple: true
+
+      - run: ls -la dist
+
+      - id: version
+        run: echo "tag=n3ds-v$(cat n3ds/VERSION)" >> "$GITHUB_OUTPUT"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: BStone 3DS ${{ steps.version.outputs.tag }}
+          body_path: n3ds/RELEASE_NOTES.md
+          files: |
+            dist/*.cia
+            dist/*.3dsx

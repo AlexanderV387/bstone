@@ -24,6 +24,57 @@ GameTimer::~GameTimer()
 	stop();
 }
 
+#ifdef __3DS__
+
+bool GameTimer::is_started() const noexcept
+{
+	return is_started_;
+}
+
+void GameTimer::start(int frequency)
+{
+	if (frequency < 10 || frequency > 100)
+	{
+		BSTONE_THROW_STATIC_SOURCE("Frequency out of range.");
+	}
+
+	frequency_ = frequency;
+	start_time_ = Clock::now();
+	offset_ = 0;
+	is_started_ = true;
+}
+
+void GameTimer::stop() noexcept
+{
+	is_started_ = false;
+}
+
+GameTimerTicks GameTimer::get_elapsed_ticks() const
+{
+	const auto elapsed_ms = std::chrono::duration_cast<Milliseconds>(Clock::now() - start_time_).count();
+	return static_cast<GameTimerTicks>((static_cast<std::int64_t>(elapsed_ms) * frequency_) / 1000);
+}
+
+GameTimerTicks GameTimer::get_ticks() const
+{
+	ensure_is_started();
+	return get_elapsed_ticks() + offset_;
+}
+
+void GameTimer::set_ticks(GameTimerTicks ticks)
+{
+	ensure_is_started();
+	offset_ = ticks - get_elapsed_ticks();
+}
+
+void GameTimer::subtract_ticks(GameTimerTicks ticks)
+{
+	ensure_is_started();
+	offset_ -= ticks;
+}
+
+#else
+
 bool GameTimer::is_started() const noexcept
 {
 	return thread_.joinable();
@@ -77,6 +128,8 @@ void GameTimer::subtract_ticks(GameTimerTicks ticks)
 	mt_ticks_.fetch_sub(ticks, std::memory_order_relaxed);
 }
 
+#endif // __3DS__
+
 GameTimer::operator GameTimerTicks() const
 {
 	return get_ticks();
@@ -90,6 +143,7 @@ void GameTimer::ensure_is_started() const
 	}
 }
 
+#ifndef __3DS__
 void GameTimer::set_ticks_internal(GameTimerTicks ticks)
 {
 	mt_ticks_.store(ticks, std::memory_order_relaxed);
@@ -127,6 +181,8 @@ void GameTimer::thread_main(int frequency) noexcept
 		std::this_thread::sleep_for(Milliseconds{new_adjusted_interval});
 	}
 }
+
+#endif // __3DS__
 
 // ==========================================================================
 

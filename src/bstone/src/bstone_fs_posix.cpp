@@ -49,8 +49,12 @@ void set_working_directory(const char* path)
 
 void create_directory(const char* path)
 {
+#ifdef __3DS__
+	const auto umask_mode = mode_t{}; // no umask on the 3DS
+#else
 	const auto umask_mode = umask(0);
 	umask(umask_mode);
+#endif
 	const auto mode = static_cast<mode_t>((S_IRWXU | S_IRWXG | S_IRWXO) & ~umask_mode);
 	const auto mkdir_result = mkdir(path, mode);
 
@@ -86,8 +90,10 @@ void create_directories(const char* path)
 		if (!got_umask)
 		{
 			got_umask = true;
+#ifndef __3DS__
 			umask_mode = umask(0);
 			umask(umask_mode);
+#endif
 		}
 
 		const auto mode = static_cast<mode_t>((S_IRWXU | S_IRWXG | S_IRWXO) & (~umask_mode));
