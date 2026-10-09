@@ -29,6 +29,11 @@ void initialize();
 bool is_game_mode() noexcept;
 void set_game_mode(bool is_game_mode) noexcept;
 
+// START pressed in a menu: leave the menus and go back to the game, from any
+// submenu (as in the Wolfenstein 3D port). Cleared by the main menu.
+bool is_menu_quick_exit() noexcept;
+void clear_menu_quick_exit() noexcept;
+
 // While a binding is being assigned, A and B are not Enter and Escape.
 void set_assigning(bool is_assigning) noexcept;
 
@@ -51,9 +56,12 @@ void present_top_framebuffer();
 void wait_for_vblank();
 
 std::uint64_t get_milliseconds();
+std::uint64_t get_microseconds();
 
-// Counts a shown frame; the frames per second appear on the bottom screen.
-void count_frame();
+// Counts a shown frame; the bottom screen shows the frames per second, the
+// milliseconds per frame and how many of them present() took (composing
+// and copying to the screen, without the vsync wait).
+void count_frame(int present_us);
 
 // Circle Pad: move and strafe. C-stick: turn.
 void poll_analog(int tics, bool is_running, int& control_x, int& control_y, int& strafe);

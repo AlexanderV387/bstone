@@ -539,6 +539,8 @@ void SwVideo::n3ds_blit(
 // The same layers and rectangles as present(), without SDL.
 void SwVideo::n3ds_present()
 {
+	const auto start_ms = n3ds::get_microseconds();
+
 	n3ds_frame_.resize(n3ds_width * n3ds_height);
 
 	for (auto i = 0; i < 256; ++i)
@@ -612,24 +614,31 @@ void SwVideo::n3ds_present()
 		}
 	}
 
-	n3ds::count_frame();
-
 	// Rotated copy: screen column x is framebuffer row x, bottom to top.
+	// In 8x8 blocks: column by column, every read was a cache miss.
 	//
 	const auto framebuffer = n3ds::get_top_framebuffer();
+	constexpr auto block = 8;
 
-	for (auto x = 0; x < n3ds_width; ++x)
+	for (auto bx = 0; bx < n3ds_width; bx += block)
 	{
-		auto dst = &framebuffer[x * n3ds_height + (n3ds_height - 1)];
-		auto src = &n3ds_frame_[x];
-
-		for (auto y = 0; y < n3ds_height; ++y)
+		for (auto by = 0; by < n3ds_height; by += block)
 		{
-			*dst-- = *src;
-			src += n3ds_width;
+			for (auto x = bx; x < bx + block; ++x)
+			{
+				auto dst = &framebuffer[x * n3ds_height + (n3ds_height - 1 - by)];
+				auto src = &n3ds_frame_[by * n3ds_width + x];
+
+				for (auto y = 0; y < block; ++y)
+				{
+					*dst-- = *src;
+					src += n3ds_width;
+				}
+			}
 		}
 	}
 
+	n3ds::count_frame(static_cast<int>(n3ds::get_microseconds() - start_ms));
 	n3ds::present_top_framebuffer();
 }
 #endif // __3DS__

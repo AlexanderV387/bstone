@@ -33,6 +33,7 @@ namespace n3ds {
 namespace {
 
 bool is_game_mode_ = false;
+bool is_menu_quick_exit_ = false;
 bool is_assigning_ = false;
 u32 last_held_ = 0;
 
@@ -191,6 +192,16 @@ void set_game_mode(bool is_game_mode) noexcept
 	is_game_mode_ = is_game_mode;
 }
 
+bool is_menu_quick_exit() noexcept
+{
+	return is_menu_quick_exit_;
+}
+
+void clear_menu_quick_exit() noexcept
+{
+	is_menu_quick_exit_ = false;
+}
+
 void set_assigning(bool is_assigning) noexcept
 {
 	is_assigning_ = is_assigning;
@@ -204,6 +215,12 @@ void handle_buttons()
 	last_held_ = held;
 
 	const auto is_menu = !is_game_mode_ && !is_assigning_;
+
+	// START in game opens the menu; in a menu it closes all of them.
+	if (is_menu && (pressed & KEY_START) != 0)
+	{
+		is_menu_quick_exit_ = true;
+	}
 
 	for (const auto& map : button_maps)
 	{
@@ -296,12 +313,19 @@ void draw_number(std::uint32_t* framebuffer, int number, int x, int y, int scale
 
 int frame_count_ = 0;
 std::uint64_t fps_time_ = 0;
+std::uint64_t present_us_total_ = 0;
 
 } // namespace
 
-void count_frame()
+std::uint64_t get_microseconds()
+{
+	return svcGetSystemTick() / CPU_TICKS_PER_USEC;
+}
+
+void count_frame(int present_us)
 {
 	++frame_count_;
+	present_us_total_ += static_cast<std::uint64_t>(present_us);
 
 	const auto now = osGetTime();
 	const auto elapsed = now - fps_time_;
@@ -312,15 +336,19 @@ void count_frame()
 	}
 
 	const auto fps = static_cast<int>((frame_count_ * 1000) / elapsed);
-	const auto frame_ms = frame_count_ > 0 ? static_cast<int>(elapsed / frame_count_) : 0;
+	const auto frame_ms = static_cast<int>(elapsed / frame_count_);
+	const auto present_ms = static_cast<int>(present_us_total_ / frame_count_ / 1000);
 	frame_count_ = 0;
+	present_us_total_ = 0;
 	fps_time_ = now;
 
-	// Frames per second (big) and milliseconds per frame (small).
+	// Frames per second (big, white), milliseconds per frame (green) and
+	// milliseconds of present() per frame (yellow).
 	const auto framebuffer = reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, nullptr, nullptr));
 	fill_bottom(framebuffer, 0, 0, 320, 240, 0x000000FFU);
-	draw_number(framebuffer, fps, 40, 60, 16, 0xFFFFFFFFU);
-	draw_number(framebuffer, frame_ms, 40, 170, 6, 0x80FF80FFU);
+	draw_number(framebuffer, fps, 40, 40, 16, 0xFFFFFFFFU);
+	draw_number(framebuffer, frame_ms, 40, 160, 8, 0x80FF80FFU);
+	draw_number(framebuffer, present_ms, 200, 160, 8, 0xFFFF40FFU);
 	GSPGPU_FlushDataCache(framebuffer, 320 * 240 * 4);
 	gfxScreenSwapBuffers(GFX_BOTTOM, false);
 }

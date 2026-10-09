@@ -418,7 +418,12 @@ CP_iteminfo NewItems = {NM_X, NM_Y, 4, 1, 0, 16, {60, -2, 105, 16, 1}};
 CP_iteminfo SwitchItems = {MENU_X, 0, 0, 0, 0, 9, {87, -1, 132, 7, 1}};
 
 // BBi
+#ifdef __3DS__
+// MODE and TEXTURING are disabled: start on WIDESCREEN.
+CP_iteminfo video_items = {MENU_X, MENU_Y + 30, 5, 2, 0, 9, {77, -1, 154, 7, 1}};
+#else
 CP_iteminfo video_items = {MENU_X, MENU_Y + 30, 5, 0, 0, 9, {77, -1, 154, 7, 1}};
+#endif
 CP_iteminfo video_mode_items = {MENU_X - 31, MENU_Y + 10, 8, 0, 0, 9, {67, -1, 184, 7, 1}};
 CP_iteminfo texturing_items = {MENU_X, MENU_Y + 10, 7, 0, 0, 9, {77, -1, 154, 7, 1}};
 CP_iteminfo switches2_items = {MENU_X, MENU_Y + 30, 5, 0, 0, 9, {87, -1, 132, 7, 1}};
@@ -1805,6 +1810,7 @@ void US_ControlPanel(
 		[was_game_mode]()
 		{
 			bstone::n3ds::set_game_mode(was_game_mode);
+			bstone::n3ds::clear_menu_quick_exit();
 		});
 #endif
 
@@ -1900,6 +1906,18 @@ void US_ControlPanel(
 			break;
 
 		case -1:
+#ifdef __3DS__
+			// B or START on the main menu: back to the game. On the title
+			// menu nothing happens; only the quit item quits.
+			bstone::n3ds::clear_menu_quick_exit();
+
+			if (ingame)
+			{
+				StartGame = 1;
+			}
+
+			break;
+#endif
 			// on hit ESC on main menu
 			if (ingame && !gp_quit_on_escape())
 			{
@@ -3582,6 +3600,7 @@ void DrawCtlScreen()
 	WindowW = 320;
 	SETFONTCOLOR(TEXTCOLOR, BKGDCOLOR);
 
+#ifndef __3DS__ // no mouse on the 3DS (SDL reports the touch screen as one)
 	if (MousePresent)
 	{
 		CtlMenu[0].active = AT_ENABLED;
@@ -3589,6 +3608,7 @@ void DrawCtlScreen()
 	}
 
 	CtlMenu[1].active = static_cast<activetypes>(in_is_mouse_enabled());
+#endif
 
 	fontnumber = 4;
 	DrawMenu(&CtlItems, &CtlMenu[0]);
@@ -4067,6 +4087,13 @@ std::int16_t HandleMenu(
 		{
 			exit = 2;
 		}
+
+#ifdef __3DS__
+		if (bstone::n3ds::is_menu_quick_exit())
+		{
+			exit = 2;
+		}
+#endif
 
 	} while (!exit);
 

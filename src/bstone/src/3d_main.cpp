@@ -7181,7 +7181,10 @@ static void write_high_scores()
 
 	try
 	{
-		archiver.open(stream);
+		// Archive in memory and write the file at once: dozens of small
+		// writes took seconds on the 3DS SD card.
+		auto memory_stream = bstone::MemoryStream{1024};
+		archiver.open(memory_stream);
 
 		for (const auto& score : Scores)
 		{
@@ -7193,6 +7196,13 @@ static void write_high_scores()
 		}
 
 		archiver.write_checksum();
+
+		const auto size = static_cast<std::intptr_t>(memory_stream.get_size());
+
+		if (stream.write(memory_stream.get_data(), size) != size)
+		{
+			BSTONE_THROW_STATIC_SOURCE("Write error.");
+		}
 
 		stream.close();
 
@@ -9687,13 +9697,32 @@ void NewViewSize()
 
 void pre_quit()
 {
+#ifdef __3DS__
+	const auto start = bstone::n3ds::get_milliseconds();
+	const auto log_time = [start](const char* step)
+	{
+		const auto ms = bstone::n3ds::get_milliseconds() - start;
+		bstone::globals::logger->log_information(
+			(std::string{"[3DS] pre_quit: "} + step + ": " + std::to_string(ms) + " ms").c_str());
+	};
+#endif
+
 	if (is_config_loaded)
 	{
 		WriteConfig();
+#ifdef __3DS__
+		log_time("config");
+#endif
 		write_high_scores();
+#ifdef __3DS__
+		log_time("high scores");
+#endif
 	}
 
 	ShutdownId();
+#ifdef __3DS__
+	log_time("shutdown");
+#endif
 }
 
 [[noreturn]]
