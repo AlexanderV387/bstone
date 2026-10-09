@@ -14,6 +14,7 @@ SPDX-License-Identifier: MIT
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 
 #include <3ds.h>
@@ -162,6 +163,26 @@ volatile int ipc_trace_lines_ = 0;
 volatile u32 ipc_trace_owner_ = 0;
 LightLock ipc_trace_lock_;
 
+// The trace's own file requests use the same thread command buffer: what
+// the traced request sent or received is kept around them.
+void trace_ipc(u32 thread_id, const char* text)
+{
+	u32 command_buffer[64];
+	u32 static_buffers[32];
+	std::memcpy(command_buffer, getThreadCommandBuffer(), sizeof(command_buffer));
+	std::memcpy(static_buffers, getThreadStaticBuffers(), sizeof(static_buffers));
+
+	LightLock_Lock(&ipc_trace_lock_);
+	ipc_trace_owner_ = thread_id;
+	trace(text);
+	ipc_trace_lines_ = ipc_trace_lines_ + 1;
+	ipc_trace_owner_ = 0;
+	LightLock_Unlock(&ipc_trace_lock_);
+
+	std::memcpy(getThreadCommandBuffer(), command_buffer, sizeof(command_buffer));
+	std::memcpy(getThreadStaticBuffers(), static_buffers, sizeof(static_buffers));
+}
+
 u32 get_thread_id()
 {
 	auto id = u32{};
@@ -205,25 +226,17 @@ Result __wrap_svcSendSyncRequest(Handle session)
 		static_cast<unsigned long>(priority), static_cast<unsigned long>(thread_id),
 		static_cast<unsigned long>(session), static_cast<unsigned long>(header));
 
-	LightLock_Lock(&ipc_trace_lock_);
-	ipc_trace_owner_ = thread_id;
-	trace(text);
-	ipc_trace_lines_ = ipc_trace_lines_ + 1;
-	ipc_trace_owner_ = 0;
-	LightLock_Unlock(&ipc_trace_lock_);
+	trace_ipc(thread_id, text);
 
 	const auto result = __real_svcSendSyncRequest(session);
 
-	std::snprintf(text, sizeof(text), "ipc< p%02lX t%lu c%08lX r%08lX",
+	// The result of the request itself is the second word of the reply.
+	std::snprintf(text, sizeof(text), "ipc< p%02lX t%lu c%08lX r%08lX %08lX",
 		static_cast<unsigned long>(priority), static_cast<unsigned long>(thread_id),
-		static_cast<unsigned long>(header), static_cast<unsigned long>(result));
+		static_cast<unsigned long>(header), static_cast<unsigned long>(result),
+		static_cast<unsigned long>(getThreadCommandBuffer()[1]));
 
-	LightLock_Lock(&ipc_trace_lock_);
-	ipc_trace_owner_ = thread_id;
-	trace(text);
-	ipc_trace_lines_ = ipc_trace_lines_ + 1;
-	ipc_trace_owner_ = 0;
-	LightLock_Unlock(&ipc_trace_lock_);
+	trace_ipc(thread_id, text);
 
 	return result;
 }
