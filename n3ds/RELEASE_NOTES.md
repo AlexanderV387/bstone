@@ -1,5 +1,12 @@
 Blake Stone: Aliens of Gold and Planet Strike for the New Nintendo 3DS, based on [BStone](https://github.com/bibendovsky/bstone) 1.3.4. 60 FPS, the 3D view on the whole top screen and the HUD with a map on the bottom screen.
 
+## New in 1.0.4
+
+- Fix: closing the game from the HOME Menu hung forever (1.0.3 did not fix it). BStone ignored the quit event SDL sends when the HOME Menu closes the game, so the game kept running in the background and the HOME Menu waited for it. The settings and high scores are now saved when you press HOME, so closing from there is instant, and the HOME Menu's sound no longer cuts out.
+- Fix: the elevator and teleporter panels ignored the buttons, so you could not change floors. They now use the menu controls: A selects, B leaves, D-pad or Circle Pad moves.
+- Fix: startup, pressing HOME and saving sometimes froze for 8 seconds. On the SD card, writing a file that had just been created or emptied could take that long; files are now written over in place.
+- Fix: small stutters when a sound played for the first time. The audio thread is back on the New 3DS's third core.
+
 ## New in 1.0.3
 
 - Fix: closing the game from the HOME Menu hung forever. The DSP is paused while the HOME Menu is open, and SDL's audio thread waited for a sound buffer that never finished; it now checks every 50 ms whether it must stop.
