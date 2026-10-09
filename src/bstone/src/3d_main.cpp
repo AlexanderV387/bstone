@@ -10147,6 +10147,11 @@ int main(
 
 #ifdef __3DS__
 	n3ds_log_time("system shut down");
+
+	if (!is_failed)
+	{
+		bstone::n3ds::on_quit();
+	}
 #endif
 
 	if (is_failed)

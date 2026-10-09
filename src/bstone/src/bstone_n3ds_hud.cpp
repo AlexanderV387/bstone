@@ -6,10 +6,10 @@ SPDX-License-Identifier: MIT
 
 // Nintendo 3DS: the HUD on the bottom screen.
 //
-// The 320x240 bottom screen is as wide as the game's 320x200 UI, so the top
-// bar (location and messages, 16 rows) and the status bar (48 rows) are
-// copied 1:1. Between them, a map of what was explored, centered on the
-// player.
+// The 320x240 bottom screen is as wide as the game's 320x200 UI, so the
+// location bar (location and messages, 16 rows) and the status bar (48 rows)
+// are copied 1:1, one above and one below (status bar on top by default).
+// Between them, a map of what was explored, centered on the player.
 
 #ifdef __3DS__
 
@@ -24,9 +24,7 @@ namespace n3ds {
 
 namespace {
 
-constexpr auto map_top = ref_top_bar_height;
 constexpr auto map_height = bottom_height - ref_top_bar_height - ref_bottom_bar_height;
-constexpr auto map_bottom = map_top + map_height;
 constexpr auto tile_size = 4; // pixels per map tile
 
 constexpr std::uint32_t map_background_color = 0x080810FFU;
@@ -54,6 +52,10 @@ void copy_ui_rows(
 		}
 	}
 }
+
+// Below the bar that is on top.
+int map_top = ref_bottom_bar_height;
+int map_bottom = map_top + map_height;
 
 // Clipped to the map area.
 void fill_map(std::uint32_t* buffer, int x, int y, int width, int height, std::uint32_t color)
@@ -146,15 +148,26 @@ void draw_bottom_hud(const std::uint8_t* ui, const std::uint32_t* colors)
 {
 	const auto buffer = get_bottom_buffer();
 
-	copy_ui_rows(buffer, ui, colors, 0, 0, ref_top_bar_height);
-	draw_map(buffer);
-	copy_ui_rows(
-		buffer,
-		ui,
-		colors,
-		vga_ref_height - ref_bottom_bar_height,
-		bottom_height - ref_bottom_bar_height,
-		ref_bottom_bar_height);
+	// Where the two bars are in the 320x200 UI.
+	constexpr auto location_bar_y = 0;
+	constexpr auto status_bar_y = vga_ref_height - ref_bottom_bar_height;
+
+	if (is_status_bar_on_top())
+	{
+		copy_ui_rows(buffer, ui, colors, status_bar_y, 0, ref_bottom_bar_height);
+		map_top = ref_bottom_bar_height;
+		map_bottom = map_top + map_height;
+		draw_map(buffer);
+		copy_ui_rows(buffer, ui, colors, location_bar_y, bottom_height - ref_top_bar_height, ref_top_bar_height);
+	}
+	else
+	{
+		copy_ui_rows(buffer, ui, colors, location_bar_y, 0, ref_top_bar_height);
+		map_top = ref_top_bar_height;
+		map_bottom = map_top + map_height;
+		draw_map(buffer);
+		copy_ui_rows(buffer, ui, colors, status_bar_y, bottom_height - ref_bottom_bar_height, ref_bottom_bar_height);
+	}
 }
 
 } // namespace n3ds

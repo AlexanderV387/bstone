@@ -32,6 +32,10 @@ void initialize();
 // START in the menu exits.
 const char* choose_game();
 
+// After a normal quit: with more than one game, the .cia relaunches itself
+// to show the picker again (as in the Wolfenstein 3D port).
+void on_quit();
+
 // Menus (the default): A is Enter and Yes, B is Escape and No, X is Delete,
 // L and R are Page Up and Page Down, the Circle Pad moves like the D-pad.
 // In game every button is only its own bindable scan code.
@@ -139,6 +143,8 @@ bool is_fps_shown() noexcept; // small frame counter on the bottom screen
 void set_fps_shown(bool value);
 bool is_hud_on_bottom() noexcept; // 3D view on the whole top screen
 void set_hud_on_bottom(bool value);
+bool is_status_bar_on_top() noexcept; // bottom screen HUD: status bar above the map
+void set_status_bar_on_top(bool value);
 
 // Call once per frame with the run binding (already inverted by "always
 // run"); returns whether the player runs, for the D-pad too.

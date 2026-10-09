@@ -10,6 +10,8 @@ SPDX-License-Identifier: MIT
 
 #include "bstone_n3ds.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -125,6 +127,7 @@ constexpr auto c_stick_max = 146;
 } // namespace
 
 void initialize_bottom_screen(); // below
+bool is_closing(); // below
 
 // An exception that nothing caught (e.g. before the game's own error
 // handling is set up): show it instead of closing silently.
@@ -206,6 +209,8 @@ constexpr GameChoice game_choices[] =
 constexpr auto game_choice_count = static_cast<int>(sizeof(game_choices) / sizeof(game_choices[0]));
 constexpr auto last_game_path = "sdmc:/3ds/bstone/last-game.txt";
 
+bool has_game_choice_ = false;
+
 bool file_exists(const char* path)
 {
 	const auto file = std::fopen(path, "rb");
@@ -238,6 +243,8 @@ const char* choose_game()
 	{
 		return nullptr; // BStone finds the game (or reports that there is none)
 	}
+
+	has_game_choice_ = true;
 
 	// Start on the last game played.
 	auto selected = 0;
@@ -328,6 +335,17 @@ const char* choose_game()
 	return game_choices[game].option;
 }
 
+void on_quit()
+{
+	// Quit in the installed .cia goes back to the game picker: relaunch this
+	// title when it exits. Not when closed from the HOME Menu, nor as a
+	// .3dsx (relaunching would restart the Homebrew Launcher).
+	if (has_game_choice_ && !envIsHomebrew() && !aptShouldClose())
+	{
+		aptSetChainloaderToSelf();
+	}
+}
+
 bool is_game_mode() noexcept
 {
 	return is_game_mode_;
@@ -399,8 +417,20 @@ std::uint32_t* get_top_framebuffer()
 	return reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_TOP, GFX_LEFT, nullptr, nullptr));
 }
 
+// Closed from the HOME Menu: the screens are no longer ours and a vblank wait
+// could block for a long time; skip them so the game shuts down at once.
+bool is_closing()
+{
+	return aptShouldClose();
+}
+
 void present_top_framebuffer()
 {
+	if (is_closing())
+	{
+		return;
+	}
+
 	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * 240 * 4);
 	gfxScreenSwapBuffers(GFX_TOP, false);
 	gspWaitForVBlank();
@@ -408,7 +438,10 @@ void present_top_framebuffer()
 
 void wait_for_vblank()
 {
-	gspWaitForVBlank();
+	if (!is_closing())
+	{
+		gspWaitForVBlank();
+	}
 }
 
 std::uint64_t get_milliseconds()
@@ -557,6 +590,11 @@ std::uint32_t* get_bottom_buffer() noexcept
 
 void present_bottom(bool is_hud)
 {
+	if (is_closing())
+	{
+		return;
+	}
+
 	is_bottom_hud_shown_ = is_hud;
 
 	if (!is_hud)
@@ -566,11 +604,12 @@ void present_bottom(bool is_hud)
 
 	if (is_fps_shown())
 	{
-		// Small, in the top right corner of the map area: frames per second
-		// (white) and milliseconds per frame (green).
-		fill_bottom(bottom_buffer_, 256, 18, 62, 13, 0x000000FFU);
-		draw_number(bottom_buffer_, fps_, 259, 20, 2, 0xFFFFFFFFU);
-		draw_number(bottom_buffer_, frame_ms_, 289, 20, 2, 0x80FF80FFU);
+		// Small, in the right corner of the map area (between the bars):
+		// frames per second (white) and milliseconds per frame (green).
+		const auto y = is_status_bar_on_top() ? 50 : 18;
+		fill_bottom(bottom_buffer_, 256, y, 62, 13, 0x000000FFU);
+		draw_number(bottom_buffer_, fps_, 259, y + 2, 2, 0xFFFFFFFFU);
+		draw_number(bottom_buffer_, frame_ms_, 289, y + 2, 2, 0x80FF80FFU);
 	}
 
 	// The HUD keeps the bottom screen on.
@@ -627,7 +666,9 @@ auto touch_speed_cvar = CVar{
 	CVarInt32Tag{}, StringView{"n3ds_touch_speed"}, CVarFlags::archive,
 	4, min_sensitivity, max_sensitivity};
 
-auto show_fps_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_show_fps"}, CVarFlags::archive, false};
+auto show_fps_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_fps_counter"}, CVarFlags::archive, false};
+
+auto status_bar_on_top_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_status_bar_on_top"}, CVarFlags::archive, true};
 
 auto hud_on_bottom_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_hud_on_bottom"}, CVarFlags::archive, true};
 
@@ -642,6 +683,7 @@ void initialize_cvars(CVarMgr& cvar_mgr)
 	cvar_mgr.add(touch_speed_cvar);
 	cvar_mgr.add(show_fps_cvar);
 	cvar_mgr.add(hud_on_bottom_cvar);
+	cvar_mgr.add(status_bar_on_top_cvar);
 }
 
 bool is_dual_stick() noexcept { return dual_stick_cvar.get_bool(); }
@@ -657,6 +699,8 @@ void set_touch_speed(int value) { touch_speed_cvar.set_int32(value); }
 bool is_fps_shown() noexcept { return show_fps_cvar.get_bool(); }
 bool is_hud_on_bottom() noexcept { return hud_on_bottom_cvar.get_bool(); }
 void set_hud_on_bottom(bool value) { hud_on_bottom_cvar.set_bool(value); }
+bool is_status_bar_on_top() noexcept { return status_bar_on_top_cvar.get_bool(); }
+void set_status_bar_on_top(bool value) { status_bar_on_top_cvar.set_bool(value); }
 void set_fps_shown(bool value) { show_fps_cvar.set_bool(value); }
 
 // ==========================================================================
@@ -814,8 +858,19 @@ void poll_analog(int tics, int& control_x, int& control_y, int& strafe)
 	auto pad = circlePosition{};
 	hidCircleRead(&pad);
 
-	const auto pad_x = apply_dead_zone(pad.dx, circle_pad_dead_zone, circle_pad_max);
-	const auto pad_y = apply_dead_zone(pad.dy, circle_pad_dead_zone, circle_pad_max);
+	// Radial dead zone and range: the Circle Pad moves in a circle, so in a
+	// diagonal each axis only reaches ~70%. Scale the direction by the tilt
+	// so that fully pushed is full speed at any angle.
+	auto pad_x = 0;
+	auto pad_y = 0;
+	const auto pad_length = std::sqrt(static_cast<float>(pad.dx * pad.dx + pad.dy * pad.dy));
+
+	if (pad_length > circle_pad_dead_zone)
+	{
+		const auto tilt = std::min(pad_length - circle_pad_dead_zone, static_cast<float>(pad_range));
+		pad_x = static_cast<int>((pad.dx * tilt) / pad_length);
+		pad_y = static_cast<int>((pad.dy * tilt) / pad_length);
+	}
 
 	control_y -= (pad_y * speed) / pad_range;
 

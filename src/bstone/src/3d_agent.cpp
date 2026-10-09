@@ -616,7 +616,13 @@ void ControlMovement(
 
 		const auto angle_delta = 90 - static_cast<int>(bstone::math::rad_to_deg(std::atan2(y, x)));
 		const auto angle = clamp_angle(ob->angle + angle_delta);
+#ifdef __3DS__
+		// The length of the movement, not only its forward part: with the
+		// Circle Pad in a diagonal the player moved slower.
+		const auto value = std::sqrt((x * x) + (y * y));
+#else
 		const auto value = std::abs(y);
+#endif
 
 		Thrust(static_cast<std::int16_t>(angle), value);
 	}
