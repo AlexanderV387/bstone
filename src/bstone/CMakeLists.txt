@@ -174,6 +174,9 @@ if (NINTENDO_3DS)
 	set_target_properties(bstone PROPERTIES
 		CXX_EXTENSIONS ON
 	)
+
+	# Every millisecond counts on the 3DS CPU.
+	target_compile_options(bstone PRIVATE -O3)
 endif ()
 
 if (WIN32)

@@ -14,6 +14,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include <thread>
 
 #include "gfxv.h"
+#include "bstone_n3ds.h"
 #include "id_ca.h"
 #include "id_heads.h"
 #include "id_in.h"
@@ -1207,6 +1208,10 @@ void hw_draw_sprites()
 */
 void DrawScaleds()
 {
+#ifdef __3DS__
+	const bstone::n3ds::ProfileScope n3ds_profile{bstone::n3ds::profile_sprites};
+#endif
+
 	if (vid_is_hw())
 	{
 		hw_draw_sprites();
@@ -1509,6 +1514,10 @@ void CalcTics()
 
 void WallRefresh()
 {
+#ifdef __3DS__
+	const bstone::n3ds::ProfileScope n3ds_profile{bstone::n3ds::profile_walls};
+#endif
+
 	//
 	// set up variables for this view
 	//

@@ -108,7 +108,11 @@ auto snd_rate_cvar = bstone::CVar{
 // snd_mix_size
 
 constexpr auto snd_mix_size_cvar_name = bstone::StringView{"snd_mix_size"};
+#ifdef __3DS__
+constexpr auto snd_mix_size_cvar_default = 40; // 20 ms cut out when a frame is slow
+#else
 constexpr auto snd_mix_size_cvar_default = 20;
+#endif
 
 auto snd_mix_size_cvar = bstone::CVar{
 	bstone::CVarInt32Tag{},

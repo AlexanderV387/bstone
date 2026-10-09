@@ -314,12 +314,18 @@ void draw_number(std::uint32_t* framebuffer, int number, int x, int y, int scale
 int frame_count_ = 0;
 std::uint64_t fps_time_ = 0;
 std::uint64_t present_us_total_ = 0;
+std::uint64_t profile_us_totals_[profile_slot_count] = {};
 
 } // namespace
 
 std::uint64_t get_microseconds()
 {
 	return svcGetSystemTick() / CPU_TICKS_PER_USEC;
+}
+
+void add_profile_time(int slot, int us)
+{
+	profile_us_totals_[slot] += static_cast<std::uint64_t>(us);
 }
 
 void count_frame(int present_us)
@@ -338,17 +344,29 @@ void count_frame(int present_us)
 	const auto fps = static_cast<int>((frame_count_ * 1000) / elapsed);
 	const auto frame_ms = static_cast<int>(elapsed / frame_count_);
 	const auto present_ms = static_cast<int>(present_us_total_ / frame_count_ / 1000);
+	int profile_ms[profile_slot_count];
+
+	for (auto i = 0; i < profile_slot_count; ++i)
+	{
+		profile_ms[i] = static_cast<int>(profile_us_totals_[i] / frame_count_ / 1000);
+		profile_us_totals_[i] = 0;
+	}
+
 	frame_count_ = 0;
 	present_us_total_ = 0;
 	fps_time_ = now;
 
-	// Frames per second (big, white), milliseconds per frame (green) and
-	// milliseconds of present() per frame (yellow).
+	// Frames per second (big, white); milliseconds per frame (green) and of
+	// present() (yellow); milliseconds of walls (cyan), floors and ceilings
+	// (magenta) and sprites (orange).
 	const auto framebuffer = reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_BOTTOM, GFX_LEFT, nullptr, nullptr));
 	fill_bottom(framebuffer, 0, 0, 320, 240, 0x000000FFU);
-	draw_number(framebuffer, fps, 40, 40, 16, 0xFFFFFFFFU);
-	draw_number(framebuffer, frame_ms, 40, 160, 8, 0x80FF80FFU);
-	draw_number(framebuffer, present_ms, 200, 160, 8, 0xFFFF40FFU);
+	draw_number(framebuffer, fps, 20, 16, 14, 0xFFFFFFFFU);
+	draw_number(framebuffer, frame_ms, 20, 110, 7, 0x80FF80FFU);
+	draw_number(framebuffer, present_ms, 170, 110, 7, 0xFFFF40FFU);
+	draw_number(framebuffer, profile_ms[profile_walls], 20, 180, 7, 0x40FFFFFFU);
+	draw_number(framebuffer, profile_ms[profile_planes], 120, 180, 7, 0xFF40FFFFU);
+	draw_number(framebuffer, profile_ms[profile_sprites], 220, 180, 7, 0xFFA020FFU);
 	GSPGPU_FlushDataCache(framebuffer, 320 * 240 * 4);
 	gfxScreenSwapBuffers(GFX_BOTTOM, false);
 }

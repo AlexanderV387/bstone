@@ -7,6 +7,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 
 #include "3d_def.h"
+#include "bstone_n3ds.h"
 #include "d3_d2.h"
 #include "id_vl.h"
 
@@ -147,6 +148,10 @@ void SetPlaneViewSize()
 
 void DrawPlanes()
 {
+#ifdef __3DS__
+	const bstone::n3ds::ProfileScope n3ds_profile{bstone::n3ds::profile_planes};
+#endif
+
 	if (vid_is_hw())
 	{
 		return;

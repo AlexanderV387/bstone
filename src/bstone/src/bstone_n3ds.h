@@ -58,6 +58,31 @@ void wait_for_vblank();
 std::uint64_t get_milliseconds();
 std::uint64_t get_microseconds();
 
+// Time spent per frame in the parts of the 3D view, shown on the bottom
+// screen: where the frame time goes.
+enum ProfileSlot
+{
+	profile_walls,
+	profile_planes, // floors and ceilings
+	profile_sprites,
+	profile_slot_count,
+};
+
+void add_profile_time(int slot, int us);
+
+class ProfileScope
+{
+public:
+	explicit ProfileScope(int slot) : slot_{slot}, start_{get_microseconds()} {}
+	ProfileScope(const ProfileScope&) = delete;
+	ProfileScope& operator=(const ProfileScope&) = delete;
+	~ProfileScope() { add_profile_time(slot_, static_cast<int>(get_microseconds() - start_)); }
+
+private:
+	int slot_;
+	std::uint64_t start_;
+};
+
 // Counts a shown frame; the bottom screen shows the frames per second, the
 // milliseconds per frame and how many of them present() took (composing
 // and copying to the screen, without the vsync wait).
