@@ -6,6 +6,11 @@ SPDX-License-Identifier: GPL-2.0-or-later
 */
 
 
+#ifdef __3DS__
+#include "bstone_n3ds.h"
+#include "bstone_scope_exit.h"
+#endif
+
 #include <cmath>
 #include <cstring>
 
@@ -3785,6 +3790,9 @@ int aog_input_floor()
 		}
 		else if (
 			Keyboard[ScanCode::sc_space] ||
+#ifdef __3DS__
+			Keyboard[ScanCode::sc_return] ||
+#endif
 			Keyboard[ScanCode::sc_mouse_left] ||
 			in_is_binding_pressed(BindingId::e_bi_attack))
 		{
@@ -4267,6 +4275,20 @@ int ps_input_floor()
 int InputFloor()
 {
 	const auto& assets_info = get_assets_info();
+
+#ifdef __3DS__
+	// The elevator and teleporter panels are menus: A is Enter, B is Escape
+	// and the Circle Pad moves the selector (in game mode, A was only its
+	// own button and nothing selected a floor).
+	const auto n3ds_was_game_mode = bstone::n3ds::is_game_mode();
+	bstone::n3ds::set_game_mode(false);
+
+	const auto n3ds_guard = bstone::make_scope_exit(
+		[n3ds_was_game_mode]()
+		{
+			bstone::n3ds::set_game_mode(n3ds_was_game_mode);
+		});
+#endif
 
 	if (assets_info.is_aog())
 	{
