@@ -32,10 +32,6 @@ void initialize();
 // START in the menu exits.
 const char* choose_game();
 
-// Appends a timed line to sdmc:/3ds/bstone/bstone_exit.txt (closing steps:
-// the log is buffered and lost when the console is turned off).
-void trace(const char* step);
-
 // Called when leaving for the HOME Menu, before the game is suspended: the
 // game saves its settings and high scores there, as it may be closed from
 // the HOME Menu (writing them then took 8 seconds instead of 0.1).

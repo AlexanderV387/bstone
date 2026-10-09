@@ -11,6 +11,10 @@ SPDX-License-Identifier: MIT
 #include <limits.h>
 #include <stdio.h>
 #include <algorithm>
+#ifdef __3DS__
+#include <mutex>
+#include <vector>
+#endif
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -60,8 +64,88 @@ bool file_posix_is_off_t_valid(off_t value)
 	return std::abs(value) <= file_posix_max_off_t;
 }
 
+#ifdef __3DS__
+// On the 3DS, a file cut to zero and written again gets its space on the SD
+// card allocated anew, which can take seconds (8 on a large card: a scan of
+// the whole FAT). Such files are written over in place instead, and cut to
+// what was written when they are closed.
+struct N3dsInPlaceFile
+{
+	int handle;
+	off_t end;
+};
+
+std::mutex n3ds_in_place_mutex;
+std::vector<N3dsInPlaceFile> n3ds_in_place_files;
+
+N3dsInPlaceFile* n3ds_find_in_place_file(int handle)
+{
+	for (auto& file : n3ds_in_place_files)
+	{
+		if (file.handle == handle)
+		{
+			return &file;
+		}
+	}
+
+	return nullptr;
+}
+
+void n3ds_add_in_place_file(int handle)
+{
+	std::lock_guard<std::mutex> lock{n3ds_in_place_mutex};
+	n3ds_in_place_files.push_back(N3dsInPlaceFile{handle, 0});
+}
+
+void n3ds_update_in_place_end(int handle)
+{
+	std::lock_guard<std::mutex> lock{n3ds_in_place_mutex};
+
+	if (const auto file = n3ds_find_in_place_file(handle))
+	{
+		file->end = std::max(file->end, lseek(handle, 0, SEEK_CUR));
+	}
+}
+
+// Returns false when the file is not written in place.
+bool n3ds_set_in_place_size(int handle, off_t size, bool& result)
+{
+	std::lock_guard<std::mutex> lock{n3ds_in_place_mutex};
+	const auto file = n3ds_find_in_place_file(handle);
+
+	if (file == nullptr)
+	{
+		return false;
+	}
+
+	file->end = size;
+	struct stat file_stat;
+	result = fstat(handle, &file_stat) == 0 && (size <= file_stat.st_size || ftruncate(handle, size) == 0);
+	return true;
+}
+
+void n3ds_close_in_place_file(int handle)
+{
+	std::lock_guard<std::mutex> lock{n3ds_in_place_mutex};
+
+	for (auto it = n3ds_in_place_files.begin(); it != n3ds_in_place_files.end(); ++it)
+	{
+		if (it->handle == handle)
+		{
+			static_cast<void>(ftruncate(handle, it->end));
+			n3ds_in_place_files.erase(it);
+			return;
+		}
+	}
+}
+#endif
+
 void file_posix_close(int handle)
 {
+#ifdef __3DS__
+	n3ds_close_in_place_file(handle);
+#endif
+
 	const int posix_result = close(handle);
 	BSTONE_ASSERT(posix_result == 0);
 	file_posix_ignore_result(posix_result);
@@ -235,6 +319,12 @@ bool file_posix_open(const char* path, FileFlags flags, int& handle, FileErrorCo
 	{}
 
 	// Truncate the file if necessary
+#ifdef __3DS__
+	if (is_truncate)
+	{
+		n3ds_add_in_place_file(handle);
+	}
+#else
 	if (is_truncate)
 	{
 		if (!file_posix_truncate(handle, 0))
@@ -243,6 +333,7 @@ bool file_posix_open(const char* path, FileFlags flags, int& handle, FileErrorCo
 			return false;
 		}
 	}
+#endif
 
 	return true;
 }
@@ -355,7 +446,11 @@ bool File::read_exactly(void* buffer, intptr_t size) const
 
 intptr_t File::write(const void* buffer, intptr_t size) const
 {
-	return ::write(handle_, buffer, size);
+	const auto result = ::write(handle_, buffer, size);
+#ifdef __3DS__
+	n3ds_update_in_place_end(handle_);
+#endif
+	return result;
 }
 
 bool File::write_exactly(const void* buffer, intptr_t size) const
@@ -376,6 +471,9 @@ bool File::write_exactly(const void* buffer, intptr_t size) const
 		src_index += posix_written_size;
 	}
 
+#ifdef __3DS__
+	n3ds_update_in_place_end(handle_);
+#endif
 	return true;
 }
 
@@ -428,6 +526,15 @@ bool File::set_size(int64_t size) const
 	{
 		return false;
 	}
+
+#ifdef __3DS__
+	auto result = false;
+
+	if (n3ds_set_in_place_size(handle_, static_cast<off_t>(size), result))
+	{
+		return result;
+	}
+#endif
 
 	return ftruncate(handle_, static_cast<off_t>(size)) == 0;
 }

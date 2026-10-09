@@ -860,9 +860,6 @@ void in_handle_events()
 				break;
 
 			case bstone::sys::EventType::quit:
-#ifdef __3DS__
-				bstone::n3ds::trace("SDL quit event");
-#endif
 				Quit();
 
 			default:

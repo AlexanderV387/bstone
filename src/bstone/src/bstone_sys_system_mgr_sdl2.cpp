@@ -4,13 +4,6 @@ Copyright (c) 2013-2024 Boris I. Bendovsky (bibendovsky@hotmail.com) and Contrib
 SPDX-License-Identifier: MIT
 */
 
-#ifdef __3DS__
-#include "bstone_n3ds.h"
-#define N3DS_TRACE(step) bstone::n3ds::trace(step)
-#else
-#define N3DS_TRACE(step)
-#endif
-
 #include <cassert>
 #include <iterator>
 #include <string>
@@ -124,14 +117,10 @@ try
 	log_versions();
 	configure_event_types();
 	sdl2_ensure_result(SDL_Init(0));
-	N3DS_TRACE("startup: SDL_Init");
 
 	audio_mgr_ = make_sdl2_audio_mgr(logger_);
-	N3DS_TRACE("startup: SDL audio");
 	event_mgr_ = make_sdl2_event_mgr(logger_);
-	N3DS_TRACE("startup: SDL events");
 	video_mgr_ = make_sdl2_video_mgr(logger_);
-	N3DS_TRACE("startup: SDL video");
 
 	logger_.log_information(">>> SDL system manager started up.");
 } BSTONE_END_FUNC_CATCH_ALL_THROW_NESTED

@@ -25,17 +25,6 @@ SPDX-License-Identifier: MIT
 #include "bstone_cvar.h"
 #include "bstone_cvar_mgr.h"
 
-namespace bstone {
-namespace n3ds {
-namespace {
-
-constexpr auto trace_path = "sdmc:/3ds/bstone/bstone_exit.txt";
-std::uint64_t trace_start_ = 0;
-
-} // namespace
-} // namespace n3ds
-} // namespace bstone
-
 // libctru's main thread stack is 32 KiB by default: too small for BStone.
 extern "C"
 {
@@ -139,33 +128,6 @@ constexpr auto c_stick_max = 146;
 
 void initialize_bottom_screen(); // below
 
-void trace(const char* step)
-{
-	// Appended and closed at once: it survives the console being turned off
-	// while the game hangs. Started anew at each launch (initialize()).
-	// The time is taken before opening the file, and how long opening it
-	// took is shown too (startup has 8-second gaps that may be the SD card).
-	const auto time = osGetTime();
-
-	if (const auto file = std::fopen(trace_path, "a"))
-	{
-		const auto open_time = osGetTime() - time;
-
-		if (open_time >= 100)
-		{
-			std::fprintf(file, "%llu ms (file opened in %llu ms): %s\n",
-				static_cast<unsigned long long>(time - trace_start_),
-				static_cast<unsigned long long>(open_time),
-				step);
-		}
-		else
-		{
-			std::fprintf(file, "%llu ms: %s\n", static_cast<unsigned long long>(time - trace_start_), step);
-		}
-
-		std::fclose(file);
-	}
-}
 // An exception that nothing caught (e.g. before the game's own error
 // handling is set up): show it instead of closing silently.
 [[noreturn]] void on_terminate()
@@ -195,20 +157,10 @@ void trace(const char* step)
 
 void initialize()
 {
-	trace_start_ = osGetTime();
-
-	if (const auto file = std::fopen(trace_path, "w"))
-	{
-		std::fclose(file);
-	}
-
-	trace("start");
-
 	osSetSpeedupEnable(true);
 	SDL_SetMainReady();
 	std::set_terminate(on_terminate);
 	initialize_bottom_screen();
-	trace("startup: initialized");
 }
 
 void show_error(const char* message)
@@ -315,11 +267,8 @@ const char* choose_game()
 		}
 	}
 
-	trace("startup: picker files checked");
 	gfxInitDefault();
-	trace("startup: picker screens");
 	consoleInit(GFX_TOP, nullptr);
-	trace("startup: picker");
 
 	auto drawn = -1;
 	auto is_chosen = false;
@@ -376,7 +325,16 @@ const char* choose_game()
 
 	const auto game = available[selected];
 
-	if (const auto file = std::fopen(last_game_path, "w"))
+	// Written over in place ("r+"): a new file gets its space on the SD card
+	// allocated anew, which can take seconds (the number is always 1 digit).
+	auto file = std::fopen(last_game_path, "r+");
+
+	if (file == nullptr)
+	{
+		file = std::fopen(last_game_path, "w");
+	}
+
+	if (file != nullptr)
 	{
 		std::fprintf(file, "%d\n", game);
 		std::fclose(file);
@@ -862,29 +820,15 @@ bool is_running() noexcept
 
 namespace {
 
-// Never leave for the HOME Menu or sleep mode with the bottom screen off.
 void (*on_suspend_)() = nullptr;
 
+// Never leave for the HOME Menu or sleep mode with the bottom screen off.
 void on_apt_hook(APT_HookType hook, void*)
 {
-	switch (hook)
+	// Leaving for the HOME Menu, from where the game may be closed.
+	if (hook == APTHOOK_ONSUSPEND && on_suspend_ != nullptr)
 	{
-		case APTHOOK_ONSUSPEND:
-			trace("apt: suspend");
-
-			if (on_suspend_ != nullptr)
-			{
-				on_suspend_();
-				trace("apt: saved");
-			}
-
-			break;
-
-		case APTHOOK_ONRESTORE: trace("apt: restore"); break;
-		case APTHOOK_ONSLEEP: trace("apt: sleep"); break;
-		case APTHOOK_ONWAKEUP: trace("apt: wakeup"); break;
-		case APTHOOK_ONEXIT: trace("apt: exit"); break;
-		default: break;
+		on_suspend_();
 	}
 
 	if (is_bottom_on_)
@@ -912,8 +856,6 @@ void on_apt_hook(APT_HookType hook, void*)
 
 void restore_bottom_screen()
 {
-	trace("atexit");
-
 	if (!is_bottom_on_)
 	{
 		set_bottom_backlight(true);

@@ -7154,6 +7154,26 @@ void read_high_scores()
 	}
 }
 
+// Files are written to a temporary file that then replaces them. Not on the
+// 3DS: a new file gets its space on the SD card allocated anew, which can
+// take seconds there (8 on a large card); the file is written over in place.
+static std::string get_temporary_path(const std::string& path)
+{
+#ifdef __3DS__
+	return path;
+#else
+	return path + ".temp";
+#endif
+}
+
+static void replace_with_temporary(const std::string& temporary_path, const std::string& path)
+{
+	if (temporary_path != path)
+	{
+		bstone::fs_utils::rename_with_overwrite(temporary_path, path);
+	}
+}
+
 static void write_high_scores()
 {
 	const auto& assets_info = get_assets_info();
@@ -7164,13 +7184,13 @@ static void write_high_scores()
 	}
 
 	const auto& scores_path = get_profile_dir() + get_score_file_name();
-	const auto& tmp_scores_path = scores_path + ".temp";
+	const auto& tmp_scores_path = get_temporary_path(scores_path);
 
 	auto stream = bstone::FileStream{};
 
 	if (!stream.open(
 		tmp_scores_path.c_str(),
-		bstone::file_flags_create | bstone::file_flags_write | bstone::file_flags_exclusive))
+		bstone::file_flags_create | bstone::file_flags_truncate | bstone::file_flags_exclusive))
 	{
 		bstone::globals::logger->log_error(
 			("Failed to open a high scores file for writing: \"" + tmp_scores_path + "\".").c_str());
@@ -7207,7 +7227,7 @@ static void write_high_scores()
 
 		stream.close();
 
-		bstone::fs_utils::rename_with_overwrite(tmp_scores_path, scores_path);
+		replace_with_temporary(tmp_scores_path, scores_path);
 	}
 	catch (const std::exception& ex)
 	{
@@ -7840,7 +7860,7 @@ void write_text_config()
 	const auto stream_data = memory_stream.get_data();
 
 	const auto& config_path = get_profile_dir() + text_config_file_name;
-	const auto& tmp_config_path = config_path + ".temp";
+	const auto& tmp_config_path = get_temporary_path(config_path);
 
 	{
 		bstone::FileStream stream(
@@ -7853,7 +7873,7 @@ void write_text_config()
 		}
 	}
 
-	bstone::fs_utils::rename_with_overwrite(tmp_config_path, config_path);
+	replace_with_temporary(tmp_config_path, config_path);
 }
 
 
@@ -9205,7 +9225,7 @@ bool SaveTheGame(
 	const std::string& file_name,
 	const std::string& description)
 {
-	const auto tmp_file_name = file_name + ".temp";
+	const auto tmp_file_name = get_temporary_path(file_name);
 
 	auto file_stream = bstone::FileStream{};
 
@@ -9346,7 +9366,7 @@ bool SaveTheGame(
 		// Rename temporary file.
 		//
 		file_stream.close();
-		bstone::fs_utils::rename_with_overwrite(tmp_file_name, file_name);
+		replace_with_temporary(tmp_file_name, file_name);
 	}
 	catch (const std::exception& ex)
 	{
@@ -9587,25 +9607,11 @@ void CycleColors()
 */
 void ShutdownId()
 {
-#ifdef __3DS__
-	bstone::n3ds::trace("ShutdownId: US");
-	US_Shutdown();
-	bstone::n3ds::trace("ShutdownId: sound");
-	sd_shutdown();
-	bstone::n3ds::trace("ShutdownId: input");
-	IN_Shutdown();
-	bstone::n3ds::trace("ShutdownId: video");
-	VW_Shutdown();
-	bstone::n3ds::trace("ShutdownId: cache");
-	CA_Shutdown();
-	bstone::n3ds::trace("ShutdownId: done");
-#else
 	US_Shutdown();
 	sd_shutdown();
 	IN_Shutdown();
 	VW_Shutdown();
 	CA_Shutdown();
-#endif
 
 	bstone::globals::page_mgr = nullptr;
 }
@@ -9733,7 +9739,6 @@ void pre_quit()
 		const auto ms = bstone::n3ds::get_milliseconds() - start;
 		bstone::globals::logger->log_information(
 			(std::string{"[3DS] pre_quit: "} + step + ": " + std::to_string(ms) + " ms").c_str());
-		bstone::n3ds::trace((std::string{"pre_quit: "} + step).c_str());
 	};
 #endif
 
@@ -10039,7 +10044,6 @@ int main(
 
 	argc = static_cast<int>(n3ds_args.size());
 	argv = n3ds_args.data();
-	bstone::n3ds::trace("startup: game chosen");
 #endif
 
 #ifdef __vita__
@@ -10097,13 +10101,7 @@ int main(
 		bstone::LoggerFlushPolicy::none;
 	logger_open_param.file_path = log_file_path.c_str();
 
-#ifdef __3DS__
-	bstone::n3ds::trace("startup: trace check");
-#endif
 	bstone::globals::logger = bstone::make_logger(logger_open_param);
-#ifdef __3DS__
-	bstone::n3ds::trace("startup: logger");
-#endif
 	const auto logger_scope = bstone::make_scope_exit([](){ bstone::globals::logger = nullptr; });
 
 	const auto version_string = std::string{} + "BStone v" + bstone::get_version().string;
@@ -10150,9 +10148,6 @@ int main(
 	{
 		auto mt_task_manager = bstone::make_mt_task_manager(1, 4096);
 		mt_task_manager_ = mt_task_manager.get();
-#ifdef __3DS__
-		bstone::n3ds::trace("startup: task threads");
-#endif
 
 		bstone::globals::sys_system_mgr = bstone::sys::make_system_mgr(sys_logger);
 
@@ -10164,9 +10159,6 @@ int main(
 		}
 
 		bstone::globals::sys_window_mgr = &bstone::globals::sys_video_mgr->get_window_mgr();
-#ifdef __3DS__
-		bstone::n3ds::trace("startup: SDL");
-#endif
 
 		freed_main();
 
@@ -10189,7 +10181,6 @@ int main(
 		const auto ms = bstone::n3ds::get_milliseconds() - n3ds_quit_time;
 		bstone::globals::logger->log_information(
 			(std::string{"[3DS] "} + step + ": " + std::to_string(ms) + " ms").c_str());
-		bstone::n3ds::trace(step);
 	};
 
 	n3ds_log_time("quit");
@@ -10214,8 +10205,6 @@ int main(
 	{
 		bstone::n3ds::on_quit();
 	}
-
-	bstone::n3ds::trace("main returns");
 #endif
 
 	if (is_failed)

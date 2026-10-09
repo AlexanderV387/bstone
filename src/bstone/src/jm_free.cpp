@@ -14,13 +14,6 @@ SPDX-License-Identifier: GPL-2.0-or-later
 //
 
 
-#ifdef __3DS__
-#include "bstone_n3ds.h"
-#define N3DS_TRACE(step) bstone::n3ds::trace(step)
-#else
-#define N3DS_TRACE(step)
-#endif
-
 #include <cmath>
 
 #include <algorithm>
@@ -1315,19 +1308,15 @@ void InitGame()
 
 	CA_Startup();
 	bstone::globals::page_mgr = bstone::make_page_mgr();
-	N3DS_TRACE("startup: cache");
 
 	check_for_extract_options();
 	read_high_scores();
 	InitPlaytemp();
-	N3DS_TRACE("startup: high scores");
 
 	sd_startup();
-	N3DS_TRACE("startup: sound");
 	IN_Startup();
 	VW_Startup();
 	US_Startup();
-	N3DS_TRACE("startup: input, video");
 
 	VL_SetPalette(0, 256, vgapal);
 
@@ -1367,7 +1356,6 @@ void InitGame()
 	LoadFonts();
 
 	LoadLatchMem();
-	N3DS_TRACE("startup: fonts, latches");
 	BuildTables(); // trig tables
 	SetupWalls();
 	NewViewSize();
@@ -1377,7 +1365,6 @@ void InitGame()
 	//
 
 	InitRedShifts();
-	N3DS_TRACE("startup: tables");
 
 	vid_is_movie = false;
 
@@ -1473,7 +1460,6 @@ void freed_main()
 	//
 	InitDestPath();
 	find_contents();
-	N3DS_TRACE("startup: content found");
 
 	bstone::globals::logger->log_information();
 	bstone::globals::logger->log_information(("Data path: \"" + data_dir_ + "\"").c_str());
@@ -1501,7 +1487,6 @@ void freed_main()
 	// BBi
 	ReadConfig();
 	deserialize_cvars_from_cli(g_args, *bstone::globals::cvar_mgr);
-	N3DS_TRACE("startup: config");
 
 	initialize_sprites();
 	initialize_gfxv_contants();
@@ -1533,5 +1518,4 @@ void freed_main()
 	InitGame();
 
 	PreDemo();
-	N3DS_TRACE("startup: intro screens");
 }
