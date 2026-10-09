@@ -579,13 +579,15 @@ void SwVideo::n3ds_present()
 	{
 		const auto& middle_rect = is_middle_wide ? ui_wide_middle_dst_rect_ : ui_4x3_middle_dst_rect_;
 		const auto src_rect = sys::Rectangle{0, ref_3d_view_top_y, vga_ref_width, ref_3d_view_height};
-		const auto dst_rect = sys::Rectangle
-		{
-			middle_rect.x,
-			middle_rect.y + ((ref_3d_view_top_y - ref_view_top_y) * middle_rect.height) / ref_view_height,
-			middle_rect.width,
-			(ref_3d_view_height * middle_rect.height) / ref_view_height,
-		};
+		const auto dst_rect = n3ds::is_ui_overlay_fullscreen() ?
+			screen_dst_rect_ :
+			sys::Rectangle
+			{
+				middle_rect.x,
+				middle_rect.y + ((ref_3d_view_top_y - ref_view_top_y) * middle_rect.height) / ref_view_height,
+				middle_rect.width,
+				(ref_3d_view_height * middle_rect.height) / ref_view_height,
+			};
 
 		n3ds_blit(ui, vga_ref_width, vga_ref_height, &src_rect, dst_rect, mask);
 	}

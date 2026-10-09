@@ -1,5 +1,10 @@
 Blake Stone: Aliens of Gold and Planet Strike for the New Nintendo 3DS, based on [BStone](https://github.com/bibendovsky/bstone) 1.3.4. 60 FPS, the 3D view on the whole top screen and the HUD with a map on the bottom screen.
 
+## New in 1.0.3
+
+- Fix: closing the game from the HOME Menu hung forever. The DSP is paused while the HOME Menu is open, and SDL's audio thread waited for a sound buffer that never finished; it now checks every 50 ms whether it must stop.
+- Fix: dying showed nothing for a moment and jumped to the end. The smooth death effect exists only in the OpenGL/Vulkan renderers; the 3DS now uses the original red dots, over the whole top screen.
+
 ## New in 1.0.2
 
 - Fix: the `.cia` showed "No message system available" with more than one game in the folder. A `.cia` gets no arguments (a `.3dsx` gets its path), so the game chosen in the picker was lost.

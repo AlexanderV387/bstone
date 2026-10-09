@@ -212,9 +212,14 @@ static void N3DSAUDIO_PlayDevice(_THIS)
 static void N3DSAUDIO_WaitDevice(_THIS)
 {
     contextLock(this);
+    /* BStone (3DS port): wait with a timeout. SDL joins this thread before
+       CloseDevice wakes it up, and when the game is closed from the HOME
+       Menu the DSP is paused: no buffer ever finished, the thread never saw
+       the shutdown and closing hung forever. */
     while (!this->hidden->isCancelled &&
+           !SDL_AtomicGet(&this->shutdown) &&
            this->hidden->waveBuf[this->hidden->nextbuf].status != NDSP_WBUF_FREE) {
-        CondVar_Wait(&this->hidden->cv, &this->hidden->lock);
+        CondVar_WaitTimeout(&this->hidden->cv, &this->hidden->lock, 50000000LL);
     }
     contextUnlock(this);
 }

@@ -111,6 +111,11 @@ void present_bottom(bool is_hud);
 // the 320x200 UI buffer (palette indices, colors in framebuffer format).
 void draw_bottom_hud(const std::uint8_t* ui, const std::uint32_t* colors);
 
+// While true (the fizzle effects), the UI over the 3D view is stretched to
+// the whole top screen instead of keeping its original place.
+void set_ui_overlay_fullscreen(bool value) noexcept;
+bool is_ui_overlay_fullscreen() noexcept;
+
 // Counts a shown frame; the bottom screen shows the frames per second, the
 // milliseconds per frame and how many of them present() took (composing
 // and copying to the screen, without the vsync wait).

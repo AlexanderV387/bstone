@@ -346,6 +346,22 @@ void on_quit()
 	}
 }
 
+namespace {
+
+bool is_ui_overlay_fullscreen_ = false;
+
+} // namespace
+
+void set_ui_overlay_fullscreen(bool value) noexcept
+{
+	is_ui_overlay_fullscreen_ = value;
+}
+
+bool is_ui_overlay_fullscreen() noexcept
+{
+	return is_ui_overlay_fullscreen_;
+}
+
 bool is_game_mode() noexcept
 {
 	return is_game_mode_;

@@ -12,6 +12,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 
 #include "bstone_fizzle_fx.h"
+#include "bstone_n3ds.h"
 
 #include "3d_def.h"
 #include "id_in.h"
@@ -55,6 +56,13 @@ bool FizzleFX::present()
 	auto frame = 0;
 
 	IN_StartAck();
+
+#ifdef __3DS__
+	// The dots are plotted in the UI over the original 3D view area; with the
+	// HUD on the bottom screen that area is stretched to the whole top screen
+	// while the effect runs.
+	n3ds::set_ui_overlay_fullscreen(true);
+#endif
 
 	TimeCount = 0;
 	LastScan = ScanCode::sc_none;
@@ -138,6 +146,10 @@ bool FizzleFX::present()
 	{
 		vid_hw_enable_fizzle_fx(false);
 	}
+
+#ifdef __3DS__
+	n3ds::set_ui_overlay_fullscreen(false);
+#endif
 
 	return is_aborted;
 }

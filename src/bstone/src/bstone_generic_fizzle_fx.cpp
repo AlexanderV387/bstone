@@ -90,7 +90,14 @@ bool GenericFizzleFX::is_abortable() const
 
 bool GenericFizzleFX::is_vanilla_only() const
 {
+#ifdef __3DS__
+	// The smooth fizzle exists only in the OpenGL/Vulkan renderers: with the
+	// software renderer the death showed nothing for 70 frames and jumped to
+	// the end. Use the original dots.
+	return true;
+#else
 	return false;
+#endif
 }
 
 int GenericFizzleFX::get_frame_count() const
