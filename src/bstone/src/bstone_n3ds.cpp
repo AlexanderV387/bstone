@@ -151,6 +151,88 @@ void trace(const char* step)
 }
 bool is_closing(); // below
 
+// Diagnostics for the closing hang: from the HOME menu suspend on, every
+// service request (IPC) of every thread is traced before and after, with
+// the thread's priority (0x30 main, 0x31 APT events, 0x2F audio, 0x18 DSP)
+// and the command header: the last one without its "after" is where it hangs.
+namespace {
+
+volatile bool is_ipc_traced_ = false;
+volatile int ipc_trace_lines_ = 0;
+volatile u32 ipc_trace_owner_ = 0;
+LightLock ipc_trace_lock_;
+
+u32 get_thread_id()
+{
+	auto id = u32{};
+	svcGetThreadId(&id, CUR_THREAD_HANDLE);
+	return id;
+}
+
+} // namespace
+
+} // namespace n3ds
+} // namespace bstone
+
+extern "C" {
+
+Result __real_svcSendSyncRequest(Handle session);
+
+Result __wrap_svcSendSyncRequest(Handle session)
+{
+	using namespace bstone::n3ds;
+
+	const auto header = getThreadCommandBuffer()[0];
+
+	// DSP_FlushDataCache of the audio thread: too many.
+	if (!is_ipc_traced_ || ipc_trace_lines_ >= 1500 || header == 0x00130082U)
+	{
+		return __real_svcSendSyncRequest(session);
+	}
+
+	const auto thread_id = get_thread_id();
+
+	if (ipc_trace_owner_ == thread_id)
+	{
+		return __real_svcSendSyncRequest(session); // the trace's own file access
+	}
+
+	auto priority = s32{};
+	svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
+
+	char text[80];
+	std::snprintf(text, sizeof(text), "ipc> p%02lX t%lu h%08lX c%08lX",
+		static_cast<unsigned long>(priority), static_cast<unsigned long>(thread_id),
+		static_cast<unsigned long>(session), static_cast<unsigned long>(header));
+
+	LightLock_Lock(&ipc_trace_lock_);
+	ipc_trace_owner_ = thread_id;
+	trace(text);
+	ipc_trace_lines_ = ipc_trace_lines_ + 1;
+	ipc_trace_owner_ = 0;
+	LightLock_Unlock(&ipc_trace_lock_);
+
+	const auto result = __real_svcSendSyncRequest(session);
+
+	std::snprintf(text, sizeof(text), "ipc< p%02lX t%lu c%08lX r%08lX",
+		static_cast<unsigned long>(priority), static_cast<unsigned long>(thread_id),
+		static_cast<unsigned long>(header), static_cast<unsigned long>(result));
+
+	LightLock_Lock(&ipc_trace_lock_);
+	ipc_trace_owner_ = thread_id;
+	trace(text);
+	ipc_trace_lines_ = ipc_trace_lines_ + 1;
+	ipc_trace_owner_ = 0;
+	LightLock_Unlock(&ipc_trace_lock_);
+
+	return result;
+}
+
+} // extern "C"
+
+namespace bstone {
+namespace n3ds {
+
 // An exception that nothing caught (e.g. before the game's own error
 // handling is set up): show it instead of closing silently.
 [[noreturn]] void on_terminate()
@@ -187,26 +269,8 @@ void initialize()
 		std::fclose(file);
 	}
 
+	LightLock_Init(&ipc_trace_lock_);
 	trace("start");
-
-	// Diagnostics for the closing hang: can this process use the New 3DS's
-	// third core, and how much of the system core does it reserve?
-	{
-		const auto thread = threadCreate([](void*) {}, nullptr, 4096, 0x30, 2, false);
-		trace(thread != nullptr ? "core 2: available" : "core 2: not available");
-
-		if (thread != nullptr)
-		{
-			threadJoin(thread, U64_MAX);
-			threadFree(thread);
-		}
-
-		auto percent = u32{};
-		char text[48];
-		std::snprintf(text, sizeof(text), "system core limit: %lu%%",
-			R_SUCCEEDED(APT_GetAppCpuTimeLimit(&percent)) ? static_cast<unsigned long>(percent) : 999UL);
-		trace(text);
-	}
 
 	osSetSpeedupEnable(true);
 	SDL_SetMainReady();
@@ -867,7 +931,7 @@ void on_apt_hook(APT_HookType hook, void*)
 {
 	switch (hook)
 	{
-		case APTHOOK_ONSUSPEND: trace("apt: suspend"); break;
+		case APTHOOK_ONSUSPEND: trace("apt: suspend"); is_ipc_traced_ = true; break;
 		case APTHOOK_ONRESTORE: trace("apt: restore"); break;
 		case APTHOOK_ONSLEEP: trace("apt: sleep"); break;
 		case APTHOOK_ONWAKEUP: trace("apt: wakeup"); break;
