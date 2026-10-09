@@ -9,6 +9,10 @@ SPDX-License-Identifier: MIT
 // Multi-threaded task manager.
 //
 
+#ifdef __3DS__
+#include "bstone_n3ds.h"
+#endif
+
 #include "bstone_mt_task_mgr.h"
 
 #include <algorithm>
@@ -422,7 +426,13 @@ void MtTaskMgrImpl::initialize_threads()
 		mt_thread.is_failed_ = false;
 		mt_thread.exception_ = nullptr;
 
+#ifdef __3DS__
+		bstone::n3ds::trace("startup: creating a task thread");
+#endif
 		mt_thread.thread_ = std::thread{&MtTaskMgrImpl::mt_thread_func, this, &mt_thread};
+#ifdef __3DS__
+		bstone::n3ds::trace("startup: task thread created");
+#endif
 	}
 }
 

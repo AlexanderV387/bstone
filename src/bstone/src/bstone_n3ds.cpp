@@ -143,9 +143,26 @@ void trace(const char* step)
 {
 	// Appended and closed at once: it survives the console being turned off
 	// while the game hangs. Started anew at each launch (initialize()).
+	// The time is taken before opening the file, and how long opening it
+	// took is shown too (startup has 8-second gaps that may be the SD card).
+	const auto time = osGetTime();
+
 	if (const auto file = std::fopen(trace_path, "a"))
 	{
-		std::fprintf(file, "%llu ms: %s\n", static_cast<unsigned long long>(osGetTime() - trace_start_), step);
+		const auto open_time = osGetTime() - time;
+
+		if (open_time >= 100)
+		{
+			std::fprintf(file, "%llu ms (file opened in %llu ms): %s\n",
+				static_cast<unsigned long long>(time - trace_start_),
+				static_cast<unsigned long long>(open_time),
+				step);
+		}
+		else
+		{
+			std::fprintf(file, "%llu ms: %s\n", static_cast<unsigned long long>(time - trace_start_), step);
+		}
+
 		std::fclose(file);
 	}
 }
@@ -191,6 +208,7 @@ void initialize()
 	SDL_SetMainReady();
 	std::set_terminate(on_terminate);
 	initialize_bottom_screen();
+	trace("startup: initialized");
 }
 
 void show_error(const char* message)
@@ -297,7 +315,9 @@ const char* choose_game()
 		}
 	}
 
+	trace("startup: picker files checked");
 	gfxInitDefault();
+	trace("startup: picker screens");
 	consoleInit(GFX_TOP, nullptr);
 	trace("startup: picker");
 
