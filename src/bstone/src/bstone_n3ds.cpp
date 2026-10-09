@@ -14,7 +14,6 @@ SPDX-License-Identifier: MIT
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <exception>
 
 #include <3ds.h>
@@ -152,100 +151,6 @@ void trace(const char* step)
 }
 bool is_closing(); // below
 
-// Diagnostics for the closing hang: from the HOME menu suspend on, every
-// service request (IPC) of every thread is traced before and after, with
-// the thread's priority (0x30 main, 0x31 APT events, 0x2F audio, 0x18 DSP)
-// and the command header: the last one without its "after" is where it hangs.
-namespace {
-
-volatile bool is_ipc_traced_ = false;
-volatile int ipc_trace_lines_ = 0;
-volatile u32 ipc_trace_owner_ = 0;
-LightLock ipc_trace_lock_;
-
-// The trace's own file requests use the same thread command buffer: what
-// the traced request sent or received is kept around them.
-void trace_ipc(u32 thread_id, const char* text)
-{
-	u32 command_buffer[64];
-	u32 static_buffers[32];
-	std::memcpy(command_buffer, getThreadCommandBuffer(), sizeof(command_buffer));
-	std::memcpy(static_buffers, getThreadStaticBuffers(), sizeof(static_buffers));
-
-	LightLock_Lock(&ipc_trace_lock_);
-	ipc_trace_owner_ = thread_id;
-	trace(text);
-	ipc_trace_lines_ = ipc_trace_lines_ + 1;
-	ipc_trace_owner_ = 0;
-	LightLock_Unlock(&ipc_trace_lock_);
-
-	std::memcpy(getThreadCommandBuffer(), command_buffer, sizeof(command_buffer));
-	std::memcpy(getThreadStaticBuffers(), static_buffers, sizeof(static_buffers));
-}
-
-u32 get_thread_id()
-{
-	auto id = u32{};
-	svcGetThreadId(&id, CUR_THREAD_HANDLE);
-	return id;
-}
-
-} // namespace
-
-} // namespace n3ds
-} // namespace bstone
-
-extern "C" {
-
-Result __real_svcSendSyncRequest(Handle session);
-
-Result __wrap_svcSendSyncRequest(Handle session)
-{
-	using namespace bstone::n3ds;
-
-	const auto header = getThreadCommandBuffer()[0];
-
-	// DSP_FlushDataCache of the audio thread: too many.
-	if (!is_ipc_traced_ || ipc_trace_lines_ >= 1500 || header == 0x00130082U)
-	{
-		return __real_svcSendSyncRequest(session);
-	}
-
-	const auto thread_id = get_thread_id();
-
-	if (ipc_trace_owner_ == thread_id)
-	{
-		return __real_svcSendSyncRequest(session); // the trace's own file access
-	}
-
-	auto priority = s32{};
-	svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
-
-	char text[80];
-	std::snprintf(text, sizeof(text), "ipc> p%02lX t%lu h%08lX c%08lX",
-		static_cast<unsigned long>(priority), static_cast<unsigned long>(thread_id),
-		static_cast<unsigned long>(session), static_cast<unsigned long>(header));
-
-	trace_ipc(thread_id, text);
-
-	const auto result = __real_svcSendSyncRequest(session);
-
-	// The result of the request itself is the second word of the reply.
-	std::snprintf(text, sizeof(text), "ipc< p%02lX t%lu c%08lX r%08lX %08lX",
-		static_cast<unsigned long>(priority), static_cast<unsigned long>(thread_id),
-		static_cast<unsigned long>(header), static_cast<unsigned long>(result),
-		static_cast<unsigned long>(getThreadCommandBuffer()[1]));
-
-	trace_ipc(thread_id, text);
-
-	return result;
-}
-
-} // extern "C"
-
-namespace bstone {
-namespace n3ds {
-
 // An exception that nothing caught (e.g. before the game's own error
 // handling is set up): show it instead of closing silently.
 [[noreturn]] void on_terminate()
@@ -282,7 +187,6 @@ void initialize()
 		std::fclose(file);
 	}
 
-	LightLock_Init(&ipc_trace_lock_);
 	trace("start");
 
 	osSetSpeedupEnable(true);
@@ -944,7 +848,7 @@ void on_apt_hook(APT_HookType hook, void*)
 {
 	switch (hook)
 	{
-		case APTHOOK_ONSUSPEND: trace("apt: suspend"); is_ipc_traced_ = true; break;
+		case APTHOOK_ONSUSPEND: trace("apt: suspend"); break;
 		case APTHOOK_ONRESTORE: trace("apt: restore"); break;
 		case APTHOOK_ONSLEEP: trace("apt: sleep"); break;
 		case APTHOOK_ONWAKEUP: trace("apt: wakeup"); break;

@@ -46,8 +46,6 @@ static void ThreadEntry(void *arg)
 #error "SDL_PASSED_BEGINTHREAD_ENDTHREAD is not supported on N3DS"
 #endif
 
-int SDL_N3DS_audio_thread_core = -9; /* BStone (3DS port): for the logs */
-
 int SDL_SYS_CreateThread(SDL_Thread *thread)
 {
     s32 priority = 0x30;
@@ -56,15 +54,20 @@ int SDL_SYS_CreateThread(SDL_Thread *thread)
 
     svcGetThreadPriority(&priority, CUR_THREAD_HANDLE);
 
-    /* BStone (3DS port): the audio thread runs on the application's own
-       core. SDL put it on the system core (core 1) with 30% of its time,
-       too little for OPL3 music emulation (the sound cut out); with 80%,
-       the HOME Menu and the system services on that core starved and
-       closing the game from the HOME Menu never finished. On core 0 with a
-       higher priority than the game it preempts the game loop as needed. */
+    /* BStone (3DS port): the audio thread first tries the New 3DS's third
+       core, free for applications; then the system core with 80% of its
+       time (with SDL's 30%, OPL3 music emulation could not keep up and the
+       sound cut out). */
     if (thread->name && (SDL_strncmp(thread->name, "SDLAudioP", 9) == 0)) {
-        cpu = 0;
-        SDL_N3DS_audio_thread_core = cpu;
+        thread->handle = threadCreate(ThreadEntry, thread, stack_size, priority, 2, false);
+
+        if (thread->handle) {
+            return 0;
+        }
+
+        if (R_SUCCEEDED(APT_SetAppCpuTimeLimit(80)) || R_SUCCEEDED(APT_SetAppCpuTimeLimit(30))) {
+            cpu = 1;
+        }
     }
 
     thread->handle = threadCreate(ThreadEntry,

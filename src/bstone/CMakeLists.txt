@@ -177,9 +177,6 @@ if (NINTENDO_3DS)
 
 	# Every millisecond counts on the 3DS CPU.
 	target_compile_options(bstone PRIVATE -O3)
-
-	# Diagnostics for the closing hang (bstone_n3ds.cpp).
-	target_link_options(bstone PRIVATE -Wl,--wrap=svcSendSyncRequest)
 endif ()
 
 if (WIN32)

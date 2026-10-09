@@ -446,6 +446,12 @@ bool Sdl2EventMgr::handle_event(const SDL_Event& sdl_e, Event& e) noexcept
 		case SDL_WINDOWEVENT:
 			return handle_event(sdl_e.window, e.window);
 
+		// Closing the window, or the game from the 3DS HOME Menu: without it
+		// the game kept running and the HOME Menu waited forever.
+		case SDL_QUIT:
+			e.common.type = EventType::quit;
+			return true;
+
 		default:
 			return false;
 	}
