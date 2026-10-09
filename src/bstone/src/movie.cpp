@@ -6,6 +6,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 */
 
 
+#include <cstring>
 #include "an_codes.h"
 #include "id_ca.h"
 #include "id_heads.h"
@@ -259,7 +260,10 @@ void Movie::show_frame(
 
 	while (true)
 	{
-		auto& ah = *reinterpret_cast<AnimChunk*>(inpic);
+		// The chunks are packed in a byte buffer, unaligned: copy them out
+		// (the 3DS faults on unaligned multi-word loads and stores).
+		auto ah = AnimChunk{};
+		std::memcpy(&ah, inpic, AnimChunk::class_size);
 
 		if (ah.opt == 0)
 		{
@@ -301,7 +305,7 @@ bool Movie::load_buffer()
 
 		if (free_space >= (blk.recsize + AnimFrame::class_size))
 		{
-			*reinterpret_cast<AnimFrame*>(frame) = blk;
+			std::memcpy(frame, &blk, AnimFrame::class_size); // unaligned
 
 			free_space -= AnimFrame::class_size;
 			frame += AnimFrame::class_size;
@@ -342,7 +346,8 @@ bool Movie::get_frame()
 
 	buffer_ptr_ = next_ptr_;
 
-	const auto& blk = *reinterpret_cast<const AnimFrame*>(buffer_ptr_);
+	auto blk = AnimFrame{};
+	std::memcpy(&blk, buffer_ptr_, AnimFrame::class_size); // unaligned
 
 	buffer_offset_ -= AnimFrame::class_size;
 	buffer_offset_ -= blk.recsize;
@@ -354,7 +359,8 @@ bool Movie::get_frame()
 void Movie::handle_page(
 	const Descriptor& descriptor)
 {
-	const auto& blk = *reinterpret_cast<const AnimFrame*>(buffer_ptr_);
+	auto blk = AnimFrame{};
+	std::memcpy(&blk, buffer_ptr_, AnimFrame::class_size); // unaligned
 
 	buffer_ptr_ += AnimFrame::class_size;
 
