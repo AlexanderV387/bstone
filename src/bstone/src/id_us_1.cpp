@@ -46,6 +46,9 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "id_sd.h"
 #include "id_vh.h"
 #include "id_vl.h"
+#ifdef __3DS__
+#include "bstone_n3ds.h"
+#endif
 
 #include "bstone_char_conv.h"
 #include "bstone_game_timer.h"
@@ -438,6 +441,9 @@ bool US_LineInput(
 	lasttime = TimeCount;
 	LastASCII = key_None;
 	LastScan = ScanCode::sc_none;
+#ifdef __3DS__
+	bstone::n3ds::show_keyboard(true); // the keyboard on the bottom screen
+#endif
 
 	while (!done)
 	{
@@ -591,6 +597,9 @@ bool US_LineInput(
 		USL_DrawString(olds);
 	}
 
+#ifdef __3DS__
+	bstone::n3ds::show_keyboard(false);
+#endif
 	VW_UpdateScreen();
 	IN_ClearKeysDown();
 	return result;

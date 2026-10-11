@@ -168,6 +168,10 @@ bool is_running() noexcept;
 // touch turning, a drag turns instead). Called by handle_buttons().
 void poll_bottom_screen_toggle();
 
+// The keyboard on the bottom screen (bstone_n3ds_keyboard): a tab in its
+// top left corner opens it; it also opens while the game asks for text.
+void show_keyboard(bool is_shown);
+
 // Circle Pad: move and strafe (dual stick) or move and turn (classic).
 // C-stick: turn. Touch screen drag: turn (optional).
 void poll_analog(int tics, int& control_x, int& control_y, int& strafe);

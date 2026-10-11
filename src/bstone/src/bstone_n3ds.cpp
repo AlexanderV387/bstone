@@ -24,6 +24,7 @@ SPDX-License-Identifier: MIT
 #include "id_in.h"
 #include "bstone_cvar.h"
 #include "bstone_cvar_mgr.h"
+#include "bstone_n3ds_keyboard.h"
 
 // libctru's main thread stack is 32 KiB by default: too small for BStone.
 extern "C"
@@ -89,6 +90,71 @@ void release_key(ScanCode key)
 	}
 
 	Keyboard[key] = false;
+}
+
+// The keys of the keyboard on the bottom screen, as the PC keyboard's.
+void send_keyboard_key(int key, bool is_down)
+{
+	static constexpr ScanCode letters[26] =
+	{
+		ScanCode::sc_a, ScanCode::sc_b, ScanCode::sc_c, ScanCode::sc_d, ScanCode::sc_e,
+		ScanCode::sc_f, ScanCode::sc_g, ScanCode::sc_h, ScanCode::sc_i, ScanCode::sc_j,
+		ScanCode::sc_k, ScanCode::sc_l, ScanCode::sc_m, ScanCode::sc_n, ScanCode::sc_o,
+		ScanCode::sc_p, ScanCode::sc_q, ScanCode::sc_r, ScanCode::sc_s, ScanCode::sc_t,
+		ScanCode::sc_u, ScanCode::sc_v, ScanCode::sc_w, ScanCode::sc_x, ScanCode::sc_y,
+		ScanCode::sc_z,
+	};
+
+	static constexpr ScanCode digits[10] =
+	{
+		ScanCode::sc_0, ScanCode::sc_1, ScanCode::sc_2, ScanCode::sc_3, ScanCode::sc_4,
+		ScanCode::sc_5, ScanCode::sc_6, ScanCode::sc_7, ScanCode::sc_8, ScanCode::sc_9,
+	};
+
+	static auto is_shift_down = false;
+	auto scan = ScanCode::sc_none;
+	auto ch = '\0';
+
+	if (key >= 'A' && key <= 'Z')
+	{
+		scan = letters[key - 'A'];
+		ch = static_cast<char>(is_shift_down ? key : key - 'A' + 'a');
+	}
+	else if (key >= '0' && key <= '9')
+	{
+		scan = digits[key - '0'];
+		ch = static_cast<char>(key);
+	}
+	else
+	{
+		switch (key)
+		{
+			case ' ': scan = ScanCode::sc_space; ch = ' '; break;
+			case '-': scan = ScanCode::sc_minus; ch = '-'; break;
+			case '.': scan = ScanCode::sc_period; ch = '.'; break;
+			case n3ds_keyboard::key_backspace: scan = ScanCode::sc_backspace; break;
+			case n3ds_keyboard::key_enter: scan = ScanCode::sc_return; break;
+			case n3ds_keyboard::key_tab: scan = ScanCode::sc_tab; break;
+			case n3ds_keyboard::key_shift: scan = ScanCode::sc_left_shift; is_shift_down = is_down; break;
+			case n3ds_keyboard::key_ctrl: scan = ScanCode::sc_control; break;
+			case n3ds_keyboard::key_alt: scan = ScanCode::sc_alt; break;
+			case n3ds_keyboard::key_f10: scan = ScanCode::sc_f10; break;
+			default: return;
+		}
+	}
+
+	if (!is_down)
+	{
+		release_key(scan);
+		return;
+	}
+
+	press_key(scan);
+
+	if (ch != '\0')
+	{
+		LastASCII = ch;
+	}
 }
 
 // Removes the dead zone and limits the range: returns -range..range.
@@ -545,6 +611,16 @@ void draw_number(std::uint32_t* framebuffer, int number, int x, int y, int scale
 	}
 }
 
+// The keyboard on the bottom screen draws with this.
+void fill_keyboard(int x, int y, int width, int height, unsigned rgb)
+{
+	x = std::max(x, 0);
+	y = std::max(y, 0);
+	width = std::min(width, bottom_width - x);
+	height = std::min(height, bottom_height - y);
+	fill_bottom(bottom_buffer_, x, y, width, height, (static_cast<std::uint32_t>(rgb) << 8) | 0xFFU);
+}
+
 int frame_count_ = 0;
 std::uint64_t fps_time_ = 0;
 int fps_ = 0;
@@ -644,11 +720,16 @@ void present_bottom(bool is_hud)
 		fill_bottom(bottom_buffer_, 0, 0, bottom_width, bottom_height, 0x000000FFU);
 	}
 
-	if (is_fps_shown())
+	// The keyboard's tab in the left corner of the map area (between the
+	// bars) and the frame counter in the right one; the open keyboard covers
+	// the whole bottom screen.
+	const auto corner_y = is_status_bar_on_top() ? 50 : 18;
+	n3ds_keyboard::Draw(fill_keyboard, corner_y);
+
+	if (is_fps_shown() && !n3ds_keyboard::IsOpen())
 	{
-		// Small, in the right corner of the map area (between the bars):
-		// frames per second (white) and milliseconds per frame (green).
-		const auto y = is_status_bar_on_top() ? 50 : 18;
+		// Frames per second (white) and milliseconds per frame (green).
+		const auto y = corner_y;
 		fill_bottom(bottom_buffer_, 256, y, 62, 13, 0x000000FFU);
 		draw_number(bottom_buffer_, fps_, 259, y + 2, 2, 0xFFFFFFFFU);
 		draw_number(bottom_buffer_, frame_ms_, 289, y + 2, 2, 0x80FF80FFU);
@@ -873,11 +954,43 @@ void initialize_bottom_screen()
 {
 	aptHook(&apt_hook_cookie_, on_apt_hook, nullptr);
 	std::atexit(restore_bottom_screen);
+	n3ds_keyboard::SetSendKey(send_keyboard_key);
+}
+
+void show_keyboard(bool is_shown)
+{
+	n3ds_keyboard::Open(is_shown);
+
+	if (is_shown && !is_bottom_on_)
+	{
+		is_bottom_on_ = true;
+		set_bottom_backlight(true);
+	}
 }
 
 void poll_bottom_screen_toggle()
 {
 	const auto is_touching = (hidKeysHeld() & KEY_TOUCH) != 0;
+	auto touch = touchPosition{};
+
+	if (is_touching)
+	{
+		hidTouchRead(&touch);
+	}
+
+	// The keyboard's tab and the open keyboard take their touches; the
+	// keyboard keeps the bottom screen on.
+	if (n3ds_keyboard::Update(is_touching, touch.px, touch.py))
+	{
+		if (n3ds_keyboard::IsOpen() && !is_bottom_on_)
+		{
+			is_bottom_on_ = true;
+			set_bottom_backlight(true);
+		}
+
+		was_touching_ = is_touching;
+		return;
+	}
 
 	// With touch turning, a drag in game turns instead; with the HUD on the
 	// bottom screen, a tap does not turn it off.
@@ -952,7 +1065,7 @@ void poll_analog(int tics, int& control_x, int& control_y, int& strafe)
 	}
 
 	// Touch turning: a horizontal drag turns, with its own speed.
-	if (is_touch_turning() && (hidKeysHeld() & KEY_TOUCH) != 0)
+	if (is_touch_turning() && (hidKeysHeld() & KEY_TOUCH) != 0 && !n3ds_keyboard::OwnsTouch())
 	{
 		auto touch = touchPosition{};
 		hidTouchRead(&touch);
