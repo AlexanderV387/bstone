@@ -1,5 +1,9 @@
 Blake Stone: Aliens of Gold and Planet Strike for the New Nintendo 3DS, based on [BStone](https://github.com/bibendovsky/bstone) 1.3.4. 60 FPS, the 3D view on the whole top screen and the HUD with a map on the bottom screen.
 
+## New in 1.1.0
+
+- **Keyboard on the bottom screen:** a tab in the top left corner of the map opens it (it also opens when you name a saved game or a high score). Cheats such as J-A-M + ENTER work as on a PC keyboard; **HOLD** keeps tapped keys down for combinations. CLOSE hides it.
+
 ## New in 1.0.4
 
 - Fix: closing the game from the HOME Menu hung forever (1.0.3 did not fix it). BStone ignored the quit event SDL sends when the HOME Menu closes the game, so the game kept running in the background and the HOME Menu waited for it. The settings and high scores are now saved when you press HOME, so closing from there is instant, and the HOME Menu's sound no longer cuts out.
