@@ -71,4 +71,4 @@ GitHub Actions (`.github/workflows/n3ds.yml`) also builds the `.cia`.
 
 - BStone: Boris I. Bendovsky and contributors.
 - Blake Stone: JAM Productions / Apogee.
-- 3DS port: AlexanderV387, with help from Claude (Anthropic).
+- 3DS port: direction, design and hardware testing by AlexanderV387; code written with Claude (AI). Original engine: BStone (Boris I. Bendovsky and contributors).
