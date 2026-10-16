@@ -25,6 +25,7 @@ SPDX-License-Identifier: MIT
 #include "bstone_cvar.h"
 #include "bstone_cvar_mgr.h"
 #include "bstone_n3ds_keyboard.h"
+#include "bstone_n3ds_weapons.h"
 
 // libctru's main thread stack is 32 KiB by default: too small for BStone.
 extern "C"
@@ -701,7 +702,7 @@ void present_bottom(bool is_hud)
 	// With the original HUD (everything on the top screen) the bottom screen
 	// has nothing to show: turn it off, unless the FPS counter is on. Applied
 	// when the setting changes (and at startup); a tap still turns it on.
-	const auto bottom_mode = is_hud_on_bottom() ? 1 : (is_fps_shown() ? 2 : 0);
+	const auto bottom_mode = is_hud_on_bottom() ? 1 : (is_fps_shown() ? 2 : (is_weapon_bar() ? 3 : 0));
 
 	if (bottom_mode != applied_bottom_mode_)
 	{
@@ -718,6 +719,15 @@ void present_bottom(bool is_hud)
 	if (!is_hud)
 	{
 		fill_bottom(bottom_buffer_, 0, 0, bottom_width, bottom_height, 0x000000FFU);
+	}
+
+	if (is_weapon_bar_shown())
+	{
+		draw_weapon_bar(fill_keyboard);
+	}
+	else
+	{
+		n3ds_weapons::Hide();
 	}
 
 	// The keyboard's tab in the left corner of the map area (between the
@@ -795,6 +805,8 @@ auto status_bar_on_top_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_status_bar_on
 
 auto hud_on_bottom_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_hud_on_bottom"}, CVarFlags::archive, true};
 
+auto weapon_bar_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_weapon_buttons"}, CVarFlags::archive, false};
+
 } // namespace
 
 void initialize_cvars(CVarMgr& cvar_mgr)
@@ -807,6 +819,7 @@ void initialize_cvars(CVarMgr& cvar_mgr)
 	cvar_mgr.add(show_fps_cvar);
 	cvar_mgr.add(hud_on_bottom_cvar);
 	cvar_mgr.add(status_bar_on_top_cvar);
+	cvar_mgr.add(weapon_bar_cvar);
 }
 
 bool is_dual_stick() noexcept { return dual_stick_cvar.get_bool(); }
@@ -825,6 +838,8 @@ void set_hud_on_bottom(bool value) { hud_on_bottom_cvar.set_bool(value); }
 bool is_status_bar_on_top() noexcept { return status_bar_on_top_cvar.get_bool(); }
 void set_status_bar_on_top(bool value) { status_bar_on_top_cvar.set_bool(value); }
 void set_fps_shown(bool value) { show_fps_cvar.set_bool(value); }
+bool is_weapon_bar() noexcept { return weapon_bar_cvar.get_bool(); }
+void set_weapon_bar(bool value) { weapon_bar_cvar.set_bool(value); }
 
 // ==========================================================================
 // Running
@@ -955,6 +970,7 @@ void initialize_bottom_screen()
 	aptHook(&apt_hook_cookie_, on_apt_hook, nullptr);
 	std::atexit(restore_bottom_screen);
 	n3ds_keyboard::SetSendKey(send_keyboard_key);
+	n3ds_weapons::SetSendKey(send_keyboard_key);
 }
 
 void show_keyboard(bool is_shown)
@@ -979,8 +995,17 @@ void poll_bottom_screen_toggle()
 	}
 
 	// The keyboard's tab and the open keyboard take their touches; the
-	// keyboard keeps the bottom screen on.
-	if (n3ds_keyboard::Update(is_touching, touch.px, touch.py))
+	// keyboard keeps the bottom screen on. The weapon buttons take theirs.
+	const auto is_keyboard = n3ds_keyboard::Update(is_touching, touch.px, touch.py);
+	const auto is_weapons = n3ds_weapons::Update(is_touching, touch.px, touch.py) && !is_keyboard;
+
+	if (is_weapons)
+	{
+		was_touching_ = is_touching;
+		return;
+	}
+
+	if (is_keyboard)
 	{
 		if (n3ds_keyboard::IsOpen() && !is_bottom_on_)
 		{
@@ -1065,7 +1090,8 @@ void poll_analog(int tics, int& control_x, int& control_y, int& strafe)
 	}
 
 	// Touch turning: a horizontal drag turns, with its own speed.
-	if (is_touch_turning() && (hidKeysHeld() & KEY_TOUCH) != 0 && !n3ds_keyboard::OwnsTouch())
+	if (is_touch_turning() && (hidKeysHeld() & KEY_TOUCH) != 0 && !n3ds_keyboard::OwnsTouch() &&
+		!n3ds_weapons::OwnsTouch())
 	{
 		auto touch = touchPosition{};
 		hidTouchRead(&touch);

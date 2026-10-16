@@ -18,13 +18,15 @@ SPDX-License-Identifier: MIT
 #include "3d_def.h"
 #include "bstone_n3ds.h"
 #include "bstone_ref_values.h"
+#include "id_ca.h"
+#include "bstone_n3ds_keyboard.h"
+#include "bstone_n3ds_weapons.h"
 
 namespace bstone {
 namespace n3ds {
 
 namespace {
 
-constexpr auto map_height = bottom_height - ref_top_bar_height - ref_bottom_bar_height;
 constexpr auto tile_size = 4; // pixels per map tile
 
 constexpr std::uint32_t map_background_color = 0x080810FFU;
@@ -53,9 +55,9 @@ void copy_ui_rows(
 	}
 }
 
-// Below the bar that is on top.
+// Below the bar that is on top, above the other one.
 int map_top = ref_bottom_bar_height;
-int map_bottom = map_top + map_height;
+int map_bottom = bottom_height - ref_top_bar_height;
 
 // Clipped to the map area.
 void fill_map(std::uint32_t* buffer, int x, int y, int width, int height, std::uint32_t color)
@@ -83,6 +85,8 @@ bool is_seen(int x, int y)
 
 void draw_map(std::uint32_t* buffer)
 {
+	const auto map_height = map_bottom - map_top;
+
 	fill_map(buffer, 0, map_top, bottom_width, map_height, map_background_color);
 
 	if (player == nullptr)
@@ -151,23 +155,50 @@ void draw_bottom_hud(const std::uint8_t* ui, const std::uint32_t* colors)
 	// Where the two bars are in the 320x200 UI.
 	constexpr auto location_bar_y = 0;
 	constexpr auto status_bar_y = vga_ref_height - ref_bottom_bar_height;
+	// The weapon buttons, if shown, below everything.
+	const auto end = bottom_hud_end();
 
 	if (is_status_bar_on_top())
 	{
 		copy_ui_rows(buffer, ui, colors, status_bar_y, 0, ref_bottom_bar_height);
 		map_top = ref_bottom_bar_height;
-		map_bottom = map_top + map_height;
+		map_bottom = end - ref_top_bar_height;
 		draw_map(buffer);
-		copy_ui_rows(buffer, ui, colors, location_bar_y, bottom_height - ref_top_bar_height, ref_top_bar_height);
+		copy_ui_rows(buffer, ui, colors, location_bar_y, map_bottom, ref_top_bar_height);
 	}
 	else
 	{
 		copy_ui_rows(buffer, ui, colors, location_bar_y, 0, ref_top_bar_height);
 		map_top = ref_top_bar_height;
-		map_bottom = map_top + map_height;
+		map_bottom = end - ref_bottom_bar_height;
 		draw_map(buffer);
-		copy_ui_rows(buffer, ui, colors, status_bar_y, bottom_height - ref_bottom_bar_height, ref_bottom_bar_height);
+		copy_ui_rows(buffer, ui, colors, status_bar_y, map_bottom, ref_bottom_bar_height);
 	}
+}
+
+bool is_weapon_bar_shown() noexcept
+{
+	return is_weapon_bar() && is_game_mode() && !n3ds_keyboard::IsOpen() && player != nullptr;
+}
+
+int bottom_hud_end() noexcept
+{
+	return bottom_height - (is_weapon_bar_shown() ? n3ds_weapons::height : 0);
+}
+
+void draw_weapon_bar(void (*fill)(int x, int y, int width, int height, unsigned rgb))
+{
+	// Aliens of Gold: the five weapons. Planet Strike: the anti-plasma
+	// cannon (6) and the plasma detonators (7) too.
+	const auto is_ps = get_assets_info().is_ps();
+	auto owned = static_cast<unsigned>(static_cast<std::uint8_t>(gamestate.weapons));
+
+	if (is_ps && gamestate.plasma_detonators > 0)
+	{
+		owned |= 1U << 6;
+	}
+
+	n3ds_weapons::Draw(fill, bottom_height - n3ds_weapons::height, is_ps ? 7 : 5, owned, gamestate.weapon);
 }
 
 } // namespace n3ds

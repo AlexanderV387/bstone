@@ -119,6 +119,12 @@ void present_bottom(bool is_hud);
 // the 320x200 UI buffer (palette indices, colors in framebuffer format).
 void draw_bottom_hud(const std::uint8_t* ui, const std::uint32_t* colors);
 
+// The weapon buttons (their option, in a game): a row of numbers at the
+// bottom of the bottom screen; the HUD ends above it.
+bool is_weapon_bar_shown() noexcept;
+int bottom_hud_end() noexcept;
+void draw_weapon_bar(void (*fill)(int x, int y, int width, int height, unsigned rgb));
+
 // While true (the fizzle effects), the UI over the 3D view is stretched to
 // the whole top screen instead of keeping its original place.
 void set_ui_overlay_fullscreen(bool value) noexcept;
@@ -157,6 +163,8 @@ void set_fps_shown(bool value);
 bool is_hud_on_bottom() noexcept; // 3D view on the whole top screen
 void set_hud_on_bottom(bool value);
 bool is_status_bar_on_top() noexcept; // bottom screen HUD: status bar above the map
+bool is_weapon_bar() noexcept; // weapon buttons at the bottom of the bottom screen
+void set_weapon_bar(bool value);
 void set_status_bar_on_top(bool value);
 
 // Call once per frame with the run binding (already inverted by "always

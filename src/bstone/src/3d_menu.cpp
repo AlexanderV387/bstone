@@ -6616,6 +6616,7 @@ enum N3dsControlsItem
 	n3ds_ci_show_fps,
 	n3ds_ci_hud,
 	n3ds_ci_status_bar,
+	n3ds_ci_weapon_bar,
 	n3ds_ci_count,
 };
 
@@ -6629,6 +6630,7 @@ CP_itemtype n3ds_controls_menu[] =
 	{AT_ENABLED, "FPS COUNTER", nullptr},
 	{AT_ENABLED, "HUD", nullptr},
 	{AT_ENABLED, "STATUS BAR", nullptr},
+	{AT_ENABLED, "WEAPON BUTTONS", nullptr},
 };
 
 CP_iteminfo n3ds_controls_items = {MENU_X - 31, MENU_Y + 10, n3ds_ci_count, 0, 0, 9, {67, -1, 184, 7, 1}};
@@ -6646,6 +6648,7 @@ std::string n3ds_controls_value(int item)
 		case n3ds_ci_show_fps: return n3ds::is_fps_shown() ? "ON" : "OFF";
 		case n3ds_ci_hud: return n3ds::is_hud_on_bottom() ? "BOTTOM SCREEN" : "TOP (ORIGINAL)";
 		case n3ds_ci_status_bar: return n3ds::is_status_bar_on_top() ? "ABOVE THE MAP" : "BELOW THE MAP";
+		case n3ds_ci_weapon_bar: return n3ds::is_weapon_bar() ? "ON" : "OFF";
 
 		case n3ds_ci_run_mode:
 			switch (n3ds::get_run_mode())
@@ -6675,6 +6678,7 @@ void n3ds_controls_change(int item, int delta)
 		case n3ds_ci_touch_turning: n3ds::set_touch_turning(!n3ds::is_touch_turning()); break;
 		case n3ds_ci_show_fps: n3ds::set_fps_shown(!n3ds::is_fps_shown()); break;
 		case n3ds_ci_status_bar: n3ds::set_status_bar_on_top(!n3ds::is_status_bar_on_top()); break;
+		case n3ds_ci_weapon_bar: n3ds::set_weapon_bar(!n3ds::is_weapon_bar()); break;
 
 		case n3ds_ci_hud:
 			// The 3D view changes height: full top screen, or between the bars.
