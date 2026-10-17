@@ -573,7 +573,7 @@ void SwVideo::n3ds_present()
 
 	// HUD on the bottom screen: the 3D view fills the top screen; only what
 	// the game draws over the view (messages, pause...) stays on top.
-	const auto is_bottom_hud = vid_is_hud && n3ds::is_hud_on_bottom();
+	const auto is_bottom_hud = vid_is_hud;
 
 	if (is_bottom_hud)
 	{

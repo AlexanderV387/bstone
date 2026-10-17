@@ -6614,7 +6614,6 @@ enum N3dsControlsItem
 	n3ds_ci_touch_turning,
 	n3ds_ci_touch_speed,
 	n3ds_ci_show_fps,
-	n3ds_ci_hud,
 	n3ds_ci_status_bar,
 	n3ds_ci_weapon_bar,
 	n3ds_ci_count,
@@ -6628,7 +6627,6 @@ CP_itemtype n3ds_controls_menu[] =
 	{AT_ENABLED, "TOUCH TURNING", nullptr},
 	{AT_ENABLED, "TOUCH SPEED", nullptr},
 	{AT_ENABLED, "FPS COUNTER", nullptr},
-	{AT_ENABLED, "HUD", nullptr},
 	{AT_ENABLED, "STATUS BAR", nullptr},
 	{AT_ENABLED, "WEAPON BUTTONS", nullptr},
 };
@@ -6646,7 +6644,6 @@ std::string n3ds_controls_value(int item)
 		case n3ds_ci_touch_turning: return n3ds::is_touch_turning() ? "ON" : "OFF";
 		case n3ds_ci_touch_speed: return std::to_string(n3ds::get_touch_speed());
 		case n3ds_ci_show_fps: return n3ds::is_fps_shown() ? "ON" : "OFF";
-		case n3ds_ci_hud: return n3ds::is_hud_on_bottom() ? "BOTTOM SCREEN" : "TOP (ORIGINAL)";
 		case n3ds_ci_status_bar: return n3ds::is_status_bar_on_top() ? "ABOVE THE MAP" : "BELOW THE MAP";
 		case n3ds_ci_weapon_bar: return n3ds::is_weapon_bar() ? "ON" : "OFF";
 
@@ -6679,13 +6676,6 @@ void n3ds_controls_change(int item, int delta)
 		case n3ds_ci_show_fps: n3ds::set_fps_shown(!n3ds::is_fps_shown()); break;
 		case n3ds_ci_status_bar: n3ds::set_status_bar_on_top(!n3ds::is_status_bar_on_top()); break;
 		case n3ds_ci_weapon_bar: n3ds::set_weapon_bar(!n3ds::is_weapon_bar()); break;
-
-		case n3ds_ci_hud:
-			// The 3D view changes height: full top screen, or between the bars.
-			n3ds::set_hud_on_bottom(!n3ds::is_hud_on_bottom());
-			NewViewSize();
-			SetPlaneViewSize();
-			break;
 
 		case n3ds_ci_stick_sensitivity:
 			n3ds::set_stick_sensitivity(wrap(n3ds::get_stick_sensitivity() + delta, n3ds::min_sensitivity, n3ds::max_sensitivity));

@@ -160,8 +160,6 @@ int get_touch_speed() noexcept; // 1-10
 void set_touch_speed(int value);
 bool is_fps_shown() noexcept; // small frame counter on the bottom screen
 void set_fps_shown(bool value);
-bool is_hud_on_bottom() noexcept; // 3D view on the whole top screen
-void set_hud_on_bottom(bool value);
 bool is_status_bar_on_top() noexcept; // bottom screen HUD: status bar above the map
 bool is_weapon_bar() noexcept; // weapon buttons at the bottom of the bottom screen
 void set_weapon_bar(bool value);

@@ -44,7 +44,7 @@ With more than one game in the folder, a menu chooses one at startup; in the `.c
 ## Features
 
 - 60 FPS on New 3DS: the frame is composed straight into the screen and paced by the vertical blank.
-- HUD on the bottom screen: status bar, location bar and a map of what you explored; the 3D view fills the top screen. Option: everything on the top screen, as on PC, with the bottom screen off.
+- HUD on the bottom screen: status bar, location bar and a map of what you explored; the 3D view fills the top screen.
 - Dual stick: Circle Pad moves and strafes, C-stick turns (classic mode available), full speed in any direction.
 - Three run modes: stick fully pushed, hold the button, or press once.
 - Touch turning for consoles without C-stick, with its own speed.

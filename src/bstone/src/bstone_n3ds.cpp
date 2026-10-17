@@ -570,7 +570,6 @@ void set_bottom_backlight(bool is_on)
 std::uint32_t bottom_buffer_[bottom_width * bottom_height];
 
 bool is_bottom_hud_shown_ = false;
-int applied_bottom_mode_ = -1;
 
 void fill_bottom(std::uint32_t* buffer, int x, int y, int width, int height, std::uint32_t color)
 {
@@ -699,23 +698,6 @@ void present_bottom(bool is_hud)
 
 	is_bottom_hud_shown_ = is_hud;
 
-	// With the original HUD (everything on the top screen) the bottom screen
-	// has nothing to show: turn it off, unless the FPS counter is on. Applied
-	// when the setting changes (and at startup); a tap still turns it on.
-	const auto bottom_mode = is_hud_on_bottom() ? 1 : (is_fps_shown() ? 2 : (is_weapon_bar() ? 3 : 0));
-
-	if (bottom_mode != applied_bottom_mode_)
-	{
-		applied_bottom_mode_ = bottom_mode;
-		const auto is_on = bottom_mode != 0;
-
-		if (is_on != is_bottom_on_)
-		{
-			is_bottom_on_ = is_on;
-			set_bottom_backlight(is_on);
-		}
-	}
-
 	if (!is_hud)
 	{
 		fill_bottom(bottom_buffer_, 0, 0, bottom_width, bottom_height, 0x000000FFU);
@@ -803,8 +785,6 @@ auto show_fps_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_fps_counter"}, CVarFla
 
 auto status_bar_on_top_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_status_bar_on_top"}, CVarFlags::archive, true};
 
-auto hud_on_bottom_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_hud_on_bottom"}, CVarFlags::archive, true};
-
 auto weapon_bar_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_weapon_buttons"}, CVarFlags::archive, false};
 
 } // namespace
@@ -817,7 +797,6 @@ void initialize_cvars(CVarMgr& cvar_mgr)
 	cvar_mgr.add(touch_turning_cvar);
 	cvar_mgr.add(touch_speed_cvar);
 	cvar_mgr.add(show_fps_cvar);
-	cvar_mgr.add(hud_on_bottom_cvar);
 	cvar_mgr.add(status_bar_on_top_cvar);
 	cvar_mgr.add(weapon_bar_cvar);
 }
@@ -833,8 +812,6 @@ void set_touch_turning(bool value) { touch_turning_cvar.set_bool(value); }
 int get_touch_speed() noexcept { return touch_speed_cvar.get_int32(); }
 void set_touch_speed(int value) { touch_speed_cvar.set_int32(value); }
 bool is_fps_shown() noexcept { return show_fps_cvar.get_bool(); }
-bool is_hud_on_bottom() noexcept { return hud_on_bottom_cvar.get_bool(); }
-void set_hud_on_bottom(bool value) { hud_on_bottom_cvar.set_bool(value); }
 bool is_status_bar_on_top() noexcept { return status_bar_on_top_cvar.get_bool(); }
 void set_status_bar_on_top(bool value) { status_bar_on_top_cvar.set_bool(value); }
 void set_fps_shown(bool value) { show_fps_cvar.set_bool(value); }
