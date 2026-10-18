@@ -1,5 +1,10 @@
 Blake Stone: Aliens of Gold and Planet Strike for the New Nintendo 3DS, based on [BStone](https://github.com/bibendovsky/bstone) 1.3.4. 60 FPS, the 3D view on the whole top screen and the HUD with a map on the bottom screen.
 
+## New in 1.2.0
+
+- **Weapon buttons on the bottom screen** (option "Weapon buttons" in 3DS Controls): a row of numbers under the map, five in Aliens of Gold and seven in Planet Strike; tap one to take that weapon.
+- The HUD is always on the bottom screen; the option to put everything on the top screen is gone. The status bar still goes above or below the map.
+
 ## New in 1.1.0
 
 - **Keyboard on the bottom screen:** a tab in the top left corner of the map opens it (it also opens when you name a saved game or a high score). Cheats such as J-A-M + ENTER work as on a PC keyboard; **HOLD** keeps tapped keys down for combinations. CLOSE hides it.
