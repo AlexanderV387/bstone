@@ -505,6 +505,15 @@ void handle_buttons()
 
 std::uint32_t* get_top_framebuffer()
 {
+	// The screen's mode to match the frame's width.
+	static bool is_mode_set = false;
+
+	if (!is_mode_set)
+	{
+		gfxSetWide(top_columns() == 2);
+		is_mode_set = true;
+	}
+
 	return reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_TOP, GFX_LEFT, nullptr, nullptr));
 }
 
@@ -522,7 +531,7 @@ void present_top_framebuffer()
 		return;
 	}
 
-	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * 240 * 4);
+	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * top_columns() * 240 * 4);
 	gfxScreenSwapBuffers(GFX_TOP, false);
 	gspWaitForVBlank();
 }
@@ -787,6 +796,8 @@ auto status_bar_on_top_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_status_bar_on
 
 auto weapon_bar_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_weapon_buttons"}, CVarFlags::archive, false};
 
+auto wide_cvar = CVar{CVarBoolTag{}, StringView{"n3ds_800x240"}, CVarFlags::archive, true};
+
 } // namespace
 
 void initialize_cvars(CVarMgr& cvar_mgr)
@@ -799,6 +810,7 @@ void initialize_cvars(CVarMgr& cvar_mgr)
 	cvar_mgr.add(show_fps_cvar);
 	cvar_mgr.add(status_bar_on_top_cvar);
 	cvar_mgr.add(weapon_bar_cvar);
+	cvar_mgr.add(wide_cvar);
 }
 
 bool is_dual_stick() noexcept { return dual_stick_cvar.get_bool(); }
@@ -817,6 +829,29 @@ void set_status_bar_on_top(bool value) { status_bar_on_top_cvar.set_bool(value);
 void set_fps_shown(bool value) { show_fps_cvar.set_bool(value); }
 bool is_weapon_bar() noexcept { return weapon_bar_cvar.get_bool(); }
 void set_weapon_bar(bool value) { weapon_bar_cvar.set_bool(value); }
+bool is_wide() noexcept { return wide_cvar.get_bool(); }
+void set_wide(bool value) { wide_cvar.set_bool(value); }
+
+int top_columns() noexcept
+{
+	// Chosen once: the 3D view's buffers and projection are made for it.
+	static int columns = 0;
+
+	if (columns == 0)
+	{
+		auto model = std::uint8_t{CFG_MODEL_3DS};
+
+		if (R_SUCCEEDED(cfguInit()))
+		{
+			CFGU_GetSystemModel(&model);
+			cfguExit();
+		}
+
+		columns = (wide_cvar.get_bool() && model != CFG_MODEL_2DS) ? 2 : 1;
+	}
+
+	return columns;
+}
 
 // ==========================================================================
 // Running

@@ -6616,6 +6616,7 @@ enum N3dsControlsItem
 	n3ds_ci_show_fps,
 	n3ds_ci_status_bar,
 	n3ds_ci_weapon_bar,
+	n3ds_ci_wide,
 	n3ds_ci_count,
 };
 
@@ -6629,6 +6630,7 @@ CP_itemtype n3ds_controls_menu[] =
 	{AT_ENABLED, "FPS COUNTER", nullptr},
 	{AT_ENABLED, "STATUS BAR", nullptr},
 	{AT_ENABLED, "WEAPON BUTTONS", nullptr},
+	{AT_ENABLED, "SCREEN 800X240", nullptr},
 };
 
 CP_iteminfo n3ds_controls_items = {MENU_X - 31, MENU_Y + 10, n3ds_ci_count, 0, 0, 9, {67, -1, 184, 7, 1}};
@@ -6646,6 +6648,11 @@ std::string n3ds_controls_value(int item)
 		case n3ds_ci_show_fps: return n3ds::is_fps_shown() ? "ON" : "OFF";
 		case n3ds_ci_status_bar: return n3ds::is_status_bar_on_top() ? "ABOVE THE MAP" : "BELOW THE MAP";
 		case n3ds_ci_weapon_bar: return n3ds::is_weapon_bar() ? "ON" : "OFF";
+
+		// (The 3D view is made for the width chosen at the start.)
+		case n3ds_ci_wide:
+			return std::string{n3ds::is_wide() ? "ON" : "OFF"} +
+				(n3ds::is_wide() != (n3ds::top_columns() == 2) ? " (RESTART)" : "");
 
 		case n3ds_ci_run_mode:
 			switch (n3ds::get_run_mode())
@@ -6676,6 +6683,7 @@ void n3ds_controls_change(int item, int delta)
 		case n3ds_ci_show_fps: n3ds::set_fps_shown(!n3ds::is_fps_shown()); break;
 		case n3ds_ci_status_bar: n3ds::set_status_bar_on_top(!n3ds::is_status_bar_on_top()); break;
 		case n3ds_ci_weapon_bar: n3ds::set_weapon_bar(!n3ds::is_weapon_bar()); break;
+		case n3ds_ci_wide: n3ds::set_wide(!n3ds::is_wide()); break;
 
 		case n3ds_ci_stick_sensitivity:
 			n3ds::set_stick_sensitivity(wrap(n3ds::get_stick_sensitivity() + delta, n3ds::min_sensitivity, n3ds::max_sensitivity));

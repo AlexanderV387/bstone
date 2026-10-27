@@ -9632,7 +9632,7 @@ void CalcProjection(
 	// divide heightnumerator by a posts distance to get the posts height for
 	// the heightbuffer.  The pixel height is height>>2
 	//
-	heightnumerator = scale_ / 64.0;
+	heightnumerator = scale_ / 64.0 / vga_pixel_aspect; // (scale_ is across: columns)
 
 	//
 	// calculate the angle offset from view angle of each pixel's ray
@@ -9713,7 +9713,7 @@ void SetViewSize()
 	CalcProjection(FOCALLENGTH);
 
 	// build all needed compiled scalers
-	SetupScaling((3 * viewwidth) / 2);
+	SetupScaling((3 * viewwidth) / (2 * vga_pixel_aspect));
 }
 
 void NewViewSize()

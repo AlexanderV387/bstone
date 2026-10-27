@@ -162,6 +162,11 @@ bool is_fps_shown() noexcept; // small frame counter on the bottom screen
 void set_fps_shown(bool value);
 bool is_status_bar_on_top() noexcept; // bottom screen HUD: status bar above the map
 bool is_weapon_bar() noexcept; // weapon buttons at the bottom of the bottom screen
+bool is_wide() noexcept; // the top screen at 800x240 (from the next start)
+void set_wide(bool value);
+// Columns of the top screen per pixel of 400x240: 2 at 800x240 (all but the
+// original 2DS, which lacks that mode), as chosen at the start.
+int top_columns() noexcept;
 void set_weapon_bar(bool value);
 void set_status_bar_on_top(bool value);
 

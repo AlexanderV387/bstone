@@ -1034,7 +1034,7 @@ std::int16_t CalcRotate(
 	// this isn't exactly correct, as it should vary by a trig value,
 	// but it is close enough with only eight rotations
 
-	int view_angle = player->angle + ((centerx - ob->viewx) / 8);
+	int view_angle = player->angle + ((centerx - ob->viewx) / (8 * vga_pixel_aspect));
 
 	if (dir == nodir)
 	{

@@ -166,6 +166,9 @@ const int vga_page_count = 3;
 extern double vga_height_scale; // vga_width / 240
 extern double vga_width_scale; // vga_width / 320
 extern double vga_wide_scale; // vga_width / 320
+// Columns per square pixel of the 3D view: 2 when it is drawn twice as wide
+// (the 3DS's 800x240 top screen), each column half as wide.
+extern int vga_pixel_aspect;
 extern int vga_width;
 extern int vga_height;
 extern int vga_area;

@@ -455,8 +455,15 @@ try {
 #ifdef __3DS__
 namespace {
 
-constexpr auto n3ds_width = 400;
+// The frame, as the top screen: 400 columns, or 800 in its wide mode (the
+// rectangles stay those of 400x240: their x is scaled).
+constexpr auto n3ds_max_width = 800;
 constexpr auto n3ds_height = 240;
+
+int n3ds_columns() noexcept
+{
+	return bstone::n3ds::top_columns();
+}
 
 // RGBA8 framebuffer word from a color.
 constexpr std::uint32_t n3ds_rgba(std::uint32_t r, std::uint32_t g, std::uint32_t b) noexcept
@@ -468,9 +475,11 @@ constexpr std::uint32_t n3ds_rgba(std::uint32_t r, std::uint32_t g, std::uint32_
 
 void SwVideo::n3ds_fill(const sys::Rectangle& rect, std::uint32_t color)
 {
-	const auto x0 = std::max(rect.x, 0);
+	const auto columns = n3ds_columns();
+	const auto n3ds_width = 400 * columns;
+	const auto x0 = std::max(rect.x * columns, 0);
 	const auto y0 = std::max(rect.y, 0);
-	const auto x1 = std::min(rect.x + rect.width, n3ds_width);
+	const auto x1 = std::min((rect.x + rect.width) * columns, n3ds_width);
 	const auto y1 = std::min(rect.y + rect.height, n3ds_height);
 
 	for (auto y = y0; y < y1; ++y)
@@ -495,16 +504,20 @@ void SwVideo::n3ds_blit(
 		return;
 	}
 
-	const auto x0 = std::max(dst_rect.x, 0);
+	const auto columns = n3ds_columns();
+	const auto n3ds_width = 400 * columns;
+	const auto dst_x = dst_rect.x * columns;
+	const auto dst_width = dst_rect.width * columns;
+	const auto x0 = std::max(dst_x, 0);
 	const auto y0 = std::max(dst_rect.y, 0);
-	const auto x1 = std::min(dst_rect.x + dst_rect.width, n3ds_width);
+	const auto x1 = std::min(dst_x + dst_width, n3ds_width);
 	const auto y1 = std::min(dst_rect.y + dst_rect.height, n3ds_height);
 
-	int src_xs[n3ds_width];
+	int src_xs[n3ds_max_width];
 
 	for (auto x = x0; x < x1; ++x)
 	{
-		src_xs[x] = sr.x + ((x - dst_rect.x) * sr.width) / dst_rect.width;
+		src_xs[x] = sr.x + ((x - dst_x) * sr.width) / dst_width;
 	}
 
 	for (auto y = y0; y < y1; ++y)
@@ -540,6 +553,7 @@ void SwVideo::n3ds_blit(
 void SwVideo::n3ds_present()
 {
 	const auto start_ms = n3ds::get_microseconds();
+	const auto n3ds_width = 400 * n3ds_columns();
 
 	n3ds_frame_.resize(n3ds_width * n3ds_height);
 

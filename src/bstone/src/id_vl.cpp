@@ -35,6 +35,9 @@ SPDX-License-Identifier: GPL-2.0-or-later
 #include "bstone_time.h"
 #include "bstone_version.h"
 #include "bstone_video_cvars.h"
+#ifdef __3DS__
+#include "bstone_n3ds.h"
+#endif
 
 
 namespace {
@@ -336,6 +339,7 @@ std::uint8_t* vga_memory = nullptr;
 double vga_height_scale = 0.0;
 double vga_width_scale = 0.0;
 double vga_wide_scale = 0.0;
+int vga_pixel_aspect = 1;
 int vga_width = 0;
 int vga_height = 0;
 int vga_area = 0;
@@ -824,11 +828,17 @@ void vid_calculate_vga_dimensions() noexcept
 	vga_width = vid_layout_.screen_viewport_width;
 	vga_height = vid_align_dimension((10 * vid_layout_.screen_height) / 12);
 
+#ifdef __3DS__
+	// The top screen at 800x240: twice the columns, the same picture.
+	vga_pixel_aspect = bstone::n3ds::top_columns();
+	vga_width *= vga_pixel_aspect;
+#endif
+
 	vga_width_scale = static_cast<double>(vga_width) / static_cast<double>(vga_ref_width);
 	vga_height_scale = static_cast<double>(vga_height) / static_cast<double>(vga_ref_height);
 
 	vga_wide_scale =
-		static_cast<double>(vga_ref_height * vga_width) /
+		static_cast<double>(vga_ref_height * (vga_width / vga_pixel_aspect)) /
 		static_cast<double>(vga_ref_width * vga_height);
 
 	vga_area = vga_width * vga_height;

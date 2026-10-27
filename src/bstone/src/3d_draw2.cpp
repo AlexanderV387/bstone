@@ -72,8 +72,9 @@ void DrawSpans(
 
 	mr_rowofs = mirrorofs[height];
 
-	mr_xstep = bstone::math::floating_to_fixed(psin / (2 * height));
-	mr_ystep = bstone::math::floating_to_fixed(pcos / (2 * height));
+	// (Per column: with vga_pixel_aspect columns per pixel, that much less.)
+	mr_xstep = bstone::math::floating_to_fixed(psin / (2 * height * vga_pixel_aspect));
+	mr_ystep = bstone::math::floating_to_fixed(pcos / (2 * height * vga_pixel_aspect));
 
 	const auto length = basedist[height];
 	const auto startxfrac = bstone::math::floating_to_fixed(viewx + (length * pcos));
@@ -123,7 +124,7 @@ void SetPlaneViewSize()
 
 		if (y > 0)
 		{
-			basedist[y] = 1.0 / 2.0 * scale_ / y;
+			basedist[y] = 1.0 / 2.0 * scale_ / vga_pixel_aspect / y;
 		}
 	}
 

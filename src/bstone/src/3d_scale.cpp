@@ -125,10 +125,13 @@ void generic_scale_shape(
 
 	const auto half_height = height / 2;
 
+	// Across: vga_pixel_aspect columns per pixel.
+	const auto width = height * vga_pixel_aspect;
+
 	const auto offset_x =
 		is_player_weapon ?
-		(viewwidth - height) / 2 :
-		xcenter - half_height;
+		(viewwidth - width) / 2 :
+		xcenter - width / 2;
 
 	const auto offset_y =
 		is_player_weapon ?
@@ -136,14 +139,14 @@ void generic_scale_shape(
 		vga_3d_view_top_y + centery - half_height;
 
 	const auto left = sprite_ptr->get_left();
-	auto x1 = offset_x + ((left * height) / dimension);
+	auto x1 = offset_x + ((left * width) / dimension);
 
 	if (x1 >= viewwidth)
 	{
 		return;
 	}
 
-	auto x2 = x1 + ((sprite_width * height) / dimension);
+	auto x2 = x1 + ((sprite_width * width) / dimension);
 
 	const auto top = sprite_ptr->get_top();
 	auto y1 = offset_y + ((top * height) / dimension);
@@ -157,12 +160,13 @@ void generic_scale_shape(
 
 
 	const auto tx_delta = static_cast<double>(dimension) / static_cast<double>(height);
+	const auto tx_column_delta = static_cast<double>(dimension) / static_cast<double>(width);
 
 	auto tx_column = 0.0;
 
 	if (x1 < 0)
 	{
-		tx_column -= tx_delta * x1;
+		tx_column -= tx_column_delta * x1;
 		x1 = 0;
 	}
 
@@ -223,7 +227,7 @@ void generic_scale_shape(
 	{
 		if (!is_player_weapon && wallheight[x] > static_cast<double>(ref_height))
 		{
-			tx_column += tx_delta;
+			tx_column += tx_column_delta;
 			continue;
 		}
 
@@ -264,7 +268,7 @@ void generic_scale_shape(
 			tx_row += tx_delta;
 		}
 
-		tx_column += tx_delta;
+		tx_column += tx_column_delta;
 	}
 }
 
