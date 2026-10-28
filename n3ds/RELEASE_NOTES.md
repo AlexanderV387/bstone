@@ -1,5 +1,9 @@
 Blake Stone: Aliens of Gold and Planet Strike for the New Nintendo 3DS, based on [BStone](https://github.com/bibendovsky/bstone) 1.3.4. 60 FPS, the 3D view on the whole top screen and the HUD with a map on the bottom screen.
 
+## New in 1.3.0
+
+- **800x240:** the top screen in its wide mode (not on the original 2DS), on by default. The 3D view is drawn with twice the columns, so walls and sprites are much sharper across; menus and texts are shown twice as wide. "Screen 800x240" in 3DS Controls turns it off (from the next start). Still 60 FPS: the top screen's image is made on the New 3DS's third core.
+
 ## New in 1.2.0
 
 - **Weapon buttons on the bottom screen** (option "Weapon buttons" in 3DS Controls): a row of numbers under the map, five in Aliens of Gold and seven in Planet Strike; tap one to take that weapon.

@@ -43,6 +43,7 @@ The buttons can be reassigned in **Options > Controls > Customize controls**.
 | Touch speed | 1-10 |
 | FPS counter | Small counter on the bottom screen: frames per second and milliseconds per frame (off by default) |
 | Status bar | Above the map (default) or below it |
+| Screen 800x240 | The top screen's wide mode (not on the original 2DS), on by default; takes effect at the next start |
 
 A tap on the touch screen turns the bottom screen off or on (not while it shows the HUD; in game with touch turning, a drag turns instead).
 
@@ -50,7 +51,7 @@ A tap on the touch screen turns the bottom screen off or on (not while it shows 
 
 - 60 FPS: the frame is composed in one pass straight into the top screen's framebuffer and waits for the vertical blank; the game no longer also sleeps until its next 70 Hz tic (the two waits drifted apart: about 40 FPS).
 
-- Software renderer at 400x240 on the top screen; no OpenGL, Vulkan or OpenAL.
+- Software renderer at 800x240 on the top screen (its wide mode; 400x240 on the original 2DS or with the option off): the 3D view with twice the columns, the heights unchanged. The top screen's image is made on the New 3DS's third core, in RGB565; no OpenGL, Vulkan or OpenAL.
 - The game timer is computed from the elapsed time instead of a ticker thread: 3DS threads on the same core do not preempt each other.
 - No file locks, shared libraries or child processes (the 3DS has none).
 
