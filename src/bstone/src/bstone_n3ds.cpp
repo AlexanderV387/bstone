@@ -543,9 +543,10 @@ void present_top_framebuffer()
 
 namespace {
 
-// (Diagnosis) where the top screen's image is made, every 10 seconds in
-// turn: 0 this core, 1 or 2 those cores (core 2 the New 3DS's third, the
-// audio's, with no time limit). The log says which, with its times.
+// Where the top screen's image is made: the New 3DS's core 2 (the audio's,
+// with no time limit), core 1 if it cannot be had. Measured at 800x240:
+// 6 ms there, 18 ms on core 1 (time-limited by the system, so 30 FPS),
+// and on this core it added to the frame (30 FPS too).
 struct Worker
 {
 	Thread thread = nullptr;
@@ -556,10 +557,9 @@ struct Worker
 };
 
 Worker workers_[3];
-int worker_core_ = 1;
+int worker_core_ = 2;
 int busy_core_ = -1;
 bool workers_tried_ = false;
-int core_frames_ = 0;
 
 void worker_main(void* arg)
 {
@@ -597,13 +597,8 @@ void core1_start(void (*job)(void*), void* data)
 			LightEvent_Init(&worker.done, RESET_ONESHOT);
 			worker.thread = threadCreate(worker_main, &worker, 64 * 1024, 0x18, core, true);
 		}
-	}
 
-	// The next core every 10 seconds of frames.
-	if (++core_frames_ >= 600)
-	{
-		core_frames_ = 0;
-		worker_core_ = (worker_core_ + 1) % 3;
+		worker_core_ = workers_[2].thread != nullptr ? 2 : 1;
 	}
 
 	auto& worker = workers_[worker_core_];
@@ -770,23 +765,6 @@ void count_frame(int present_us)
 	frame_count_ = 0;
 	present_us_total_ = 0;
 	fps_time_ = now;
-
-	// In the log every 5 seconds, playing or not: the frame rate and what
-	// each part of a frame takes.
-	static int seconds = 0;
-
-	if (++seconds >= 5)
-	{
-		seconds = 0;
-		bstone::globals::logger->log_information((
-			std::string{"[3DS] perf: "} + std::to_string(fps_) + " FPS, " +
-			std::to_string(frame_ms_) + " ms a frame (screen image " + std::to_string(present_ms_) +
-			", walls " + std::to_string(profile_ms_[profile_walls]) +
-			", floors and ceilings " + std::to_string(profile_ms_[profile_planes]) +
-			", sprites " + std::to_string(profile_ms_[profile_sprites]) +
-			"; image on core " + std::to_string(presenting_core()) + ": " + std::to_string(profile_ms_[profile_core1]) + " ms), " +
-			std::to_string(400 * top_columns()) + "x240" + (is_game_mode() ? ", playing" : "")).c_str());
-	}
 }
 
 std::uint32_t* get_bottom_buffer() noexcept
