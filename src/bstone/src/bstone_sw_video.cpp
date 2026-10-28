@@ -146,6 +146,7 @@ private:
 	std::array<std::uint32_t, 256> n3ds_colors_{};
 
 	void n3ds_present();
+	void n3ds_present_playing();
 	void n3ds_fill(const sys::Rectangle& rect, std::uint32_t color);
 	void n3ds_blit(
 		const std::uint8_t* src,
@@ -549,6 +550,90 @@ void SwVideo::n3ds_blit(
 	}
 }
 
+// The 3D view scaled to the whole top screen, the UI over it where its mask
+// says, written rotated into the framebuffer in 8x8 blocks.
+void SwVideo::n3ds_present_playing()
+{
+	const auto columns = n3ds_columns();
+	const auto n3ds_width = 400 * columns;
+
+	// The UI's rectangle over the view (as in n3ds_present).
+	const auto is_middle_wide = vid_cfg_is_widescreen();
+	const auto& middle_rect = is_middle_wide ? ui_wide_middle_dst_rect_ : ui_4x3_middle_dst_rect_;
+	const auto ui_src = sys::Rectangle{0, ref_3d_view_top_y, vga_ref_width, ref_3d_view_height};
+	const auto ui_dst = n3ds::is_ui_overlay_fullscreen() ?
+		screen_dst_rect_ :
+		sys::Rectangle
+		{
+			middle_rect.x,
+			middle_rect.y + ((ref_3d_view_top_y - ref_view_top_y) * middle_rect.height) / ref_view_height,
+			middle_rect.width,
+			(ref_3d_view_height * middle_rect.height) / ref_view_height,
+		};
+
+	static int view_xs[n3ds_max_width];
+	static int view_ys[n3ds_height];
+	static int ui_xs[n3ds_max_width];
+	static int ui_ys[n3ds_height];
+
+	for (auto x = 0; x < n3ds_width; ++x)
+	{
+		view_xs[x] = (x * vga_width) / n3ds_width;
+
+		const auto ui_x = x - ui_dst.x * columns;
+		ui_xs[x] = (ui_x >= 0 && ui_x < ui_dst.width * columns) ?
+			ui_src.x + (ui_x * ui_src.width) / (ui_dst.width * columns) :
+			-1;
+	}
+
+	for (auto y = 0; y < n3ds_height; ++y)
+	{
+		view_ys[y] = ((y * vga_height) / n3ds_height) * vga_width;
+
+		const auto ui_y = y - ui_dst.y;
+		ui_ys[y] = (ui_y >= 0 && ui_y < ui_dst.height && ui_src.height > 0) ?
+			(ui_src.y + (ui_y * ui_src.height) / ui_dst.height) * vga_ref_width :
+			-1;
+	}
+
+	const auto view = sw_vga_buffer_.data();
+	const auto ui = vid_ui_buffer_.data();
+	const auto mask = vid_mask_buffer_.data();
+	const auto colors = n3ds_colors_.data();
+	const auto framebuffer = n3ds::get_top_framebuffer();
+	constexpr auto block = 8;
+
+	for (auto bx = 0; bx < n3ds_width; bx += block)
+	{
+		for (auto by = 0; by < n3ds_height; by += block)
+		{
+			for (auto x = bx; x < bx + block; ++x)
+			{
+				auto dst = &framebuffer[x * n3ds_height + (n3ds_height - 1 - by)];
+				const auto view_x = view_xs[x];
+				const auto ui_x = ui_xs[x];
+
+				for (auto y = by; y < by + block; ++y)
+				{
+					auto color = view[view_ys[y] + view_x];
+
+					if (ui_x >= 0 && ui_ys[y] >= 0)
+					{
+						const auto k = ui_ys[y] + ui_x;
+
+						if (mask[k])
+						{
+							color = ui[k];
+						}
+					}
+
+					*dst-- = colors[color];
+				}
+			}
+		}
+	}
+}
+
 // The same layers and rectangles as present(), without SDL.
 void SwVideo::n3ds_present()
 {
@@ -564,6 +649,23 @@ void SwVideo::n3ds_present()
 	}
 
 	const auto black = n3ds_rgba(0, 0, 0);
+
+	// Playing (the 3D view over the whole top screen, what the game draws
+	// over it masked in): in one pass, straight into the rotated
+	// framebuffer. Four passes over the frame (clear, view, overlay,
+	// rotation) took longer than a frame at 800x240.
+	if (vid_is_hud &&
+		screen_dst_rect_.x == 0 && screen_dst_rect_.y == 0 &&
+		screen_dst_rect_.width == 400 && screen_dst_rect_.height == n3ds_height)
+	{
+		n3ds_present_playing();
+		n3ds::draw_bottom_hud(vid_ui_buffer_.data(), n3ds_colors_.data());
+		n3ds::present_bottom(true);
+		n3ds::count_frame(static_cast<int>(n3ds::get_microseconds() - start_ms));
+		n3ds::present_top_framebuffer();
+		return;
+	}
+
 	std::fill(n3ds_frame_.begin(), n3ds_frame_.end(), black);
 
 	// HUD+3D stuff
