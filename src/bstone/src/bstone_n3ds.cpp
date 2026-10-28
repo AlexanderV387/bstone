@@ -543,64 +543,89 @@ void present_top_framebuffer()
 
 namespace {
 
-Thread core1_thread_ = nullptr;
-LightEvent core1_go_;
-LightEvent core1_done_;
-void (*core1_job_)(void*) = nullptr;
-void* core1_data_ = nullptr;
-bool core1_busy_ = false;
-bool core1_tried_ = false;
-
-void core1_main(void*)
+// (Diagnosis) where the top screen's image is made, every 10 seconds in
+// turn: 0 this core, 1 or 2 those cores (core 2 the New 3DS's third, the
+// audio's, with no time limit). The log says which, with its times.
+struct Worker
 {
+	Thread thread = nullptr;
+	LightEvent go;
+	LightEvent done;
+	void (*job)(void*) = nullptr;
+	void* data = nullptr;
+};
+
+Worker workers_[3];
+int worker_core_ = 1;
+int busy_core_ = -1;
+bool workers_tried_ = false;
+int core_frames_ = 0;
+
+void worker_main(void* arg)
+{
+	auto& worker = *static_cast<Worker*>(arg);
+
 	for (;;)
 	{
-		LightEvent_Wait(&core1_go_);
-
-		if (core1_job_ == nullptr)
-		{
-			break; // (never: the thread lives as long as the game)
-		}
-
-		core1_job_(core1_data_);
-		LightEvent_Signal(&core1_done_);
+		LightEvent_Wait(&worker.go);
+		worker.job(worker.data);
+		LightEvent_Signal(&worker.done);
 	}
 }
 
 } // namespace
 
+int presenting_core() noexcept
+{
+	return worker_core_;
+}
+
 void core1_start(void (*job)(void*), void* data)
 {
-	if (!core1_tried_)
+	if (!workers_tried_)
 	{
-		core1_tried_ = true;
-		LightEvent_Init(&core1_go_, RESET_ONESHOT);
-		LightEvent_Init(&core1_done_, RESET_ONESHOT);
-
-		if (R_SUCCEEDED(APT_SetAppCpuTimeLimit(80)) || R_SUCCEEDED(APT_SetAppCpuTimeLimit(30)))
+		workers_tried_ = true;
+		if (R_FAILED(APT_SetAppCpuTimeLimit(80)))
 		{
-			core1_thread_ = threadCreate(core1_main, nullptr, 64 * 1024, 0x18, 1, true);
+			APT_SetAppCpuTimeLimit(30);
+		}
+
+		for (auto core = 1; core <= 2; ++core)
+		{
+			auto& worker = workers_[core];
+			LightEvent_Init(&worker.go, RESET_ONESHOT);
+			LightEvent_Init(&worker.done, RESET_ONESHOT);
+			worker.thread = threadCreate(worker_main, &worker, 64 * 1024, 0x18, core, true);
 		}
 	}
 
-	if (core1_thread_ == nullptr || is_closing())
+	// The next core every 10 seconds of frames.
+	if (++core_frames_ >= 600)
+	{
+		core_frames_ = 0;
+		worker_core_ = (worker_core_ + 1) % 3;
+	}
+
+	auto& worker = workers_[worker_core_];
+
+	if (worker_core_ == 0 || worker.thread == nullptr || is_closing())
 	{
 		job(data);
 		return;
 	}
 
-	core1_job_ = job;
-	core1_data_ = data;
-	core1_busy_ = true;
-	LightEvent_Signal(&core1_go_);
+	worker.job = job;
+	worker.data = data;
+	busy_core_ = worker_core_;
+	LightEvent_Signal(&worker.go);
 }
 
 void core1_wait()
 {
-	if (core1_busy_)
+	if (busy_core_ >= 0)
 	{
-		LightEvent_Wait(&core1_done_);
-		core1_busy_ = false;
+		LightEvent_Wait(&workers_[busy_core_].done);
+		busy_core_ = -1;
 	}
 }
 
@@ -759,7 +784,7 @@ void count_frame(int present_us)
 			", walls " + std::to_string(profile_ms_[profile_walls]) +
 			", floors and ceilings " + std::to_string(profile_ms_[profile_planes]) +
 			", sprites " + std::to_string(profile_ms_[profile_sprites]) +
-			"; on core 1: " + std::to_string(profile_ms_[profile_core1]) + " ms), " +
+			"; image on core " + std::to_string(presenting_core()) + ": " + std::to_string(profile_ms_[profile_core1]) + " ms), " +
 			std::to_string(400 * top_columns()) + "x240" + (is_game_mode() ? ", playing" : "")).c_str());
 	}
 }
