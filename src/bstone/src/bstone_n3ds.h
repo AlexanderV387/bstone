@@ -69,7 +69,9 @@ void handle_buttons();
 
 // Top screen framebuffer: 400x240 RGBA8 pixels (0xRRGGBBAA), stored rotated:
 // screen pixel (x, y) is at [x * 240 + (239 - y)].
-std::uint32_t* get_top_framebuffer();
+// In RGB565: half the bytes of RGBA8 to write each frame (at 800x240,
+// writing the RGBA8 frame took longer than a frame on the other core).
+std::uint16_t* get_top_framebuffer();
 
 // Shows the top framebuffer and waits for the vertical blank (SDL's
 // software renderer on the 3DS ignores vsync).

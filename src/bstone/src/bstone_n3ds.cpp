@@ -507,18 +507,19 @@ void handle_buttons()
 	}
 }
 
-std::uint32_t* get_top_framebuffer()
+std::uint16_t* get_top_framebuffer()
 {
 	// The screen's mode to match the frame's width.
 	static bool is_mode_set = false;
 
 	if (!is_mode_set)
 	{
+		gfxSetScreenFormat(GFX_TOP, GSP_RGB565_OES);
 		gfxSetWide(top_columns() == 2);
 		is_mode_set = true;
 	}
 
-	return reinterpret_cast<std::uint32_t*>(gfxGetFramebuffer(GFX_TOP, GFX_LEFT, nullptr, nullptr));
+	return reinterpret_cast<std::uint16_t*>(gfxGetFramebuffer(GFX_TOP, GFX_LEFT, nullptr, nullptr));
 }
 
 // Closed from the HOME Menu: the screens are no longer ours and a vblank wait
@@ -535,7 +536,7 @@ void present_top_framebuffer()
 		return;
 	}
 
-	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * top_columns() * 240 * 4);
+	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * top_columns() * 240 * 2);
 	gfxScreenSwapBuffers(GFX_TOP, false);
 	gspWaitForVBlank();
 }

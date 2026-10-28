@@ -150,7 +150,7 @@ private:
 	std::vector<std::uint8_t> n3ds_view_copy_{};
 	std::vector<std::uint8_t> n3ds_ui_copy_{};
 	std::vector<std::uint8_t> n3ds_mask_copy_{};
-	std::array<std::uint32_t, 256> n3ds_colors_copy_{};
+	std::array<std::uint16_t, 256> n3ds_colors_copy_{}; // RGB565, as the framebuffer
 	std::vector<int> n3ds_view_xs_{};
 	std::vector<int> n3ds_ui_xs_{};
 	std::array<int, 240> n3ds_view_ys_{};
@@ -485,6 +485,12 @@ constexpr std::uint32_t n3ds_rgba(std::uint32_t r, std::uint32_t g, std::uint32_
 	return (r << 24) | (g << 16) | (b << 8) | 0xFFU;
 }
 
+// The top screen's RGB565 from an RGBA8 word.
+constexpr std::uint16_t n3ds_rgb565(std::uint32_t rgba) noexcept
+{
+	return static_cast<std::uint16_t>(((rgba >> 16) & 0xF800U) | ((rgba >> 13) & 0x07E0U) | ((rgba >> 11) & 0x001FU));
+}
+
 } // namespace
 
 void SwVideo::n3ds_fill(const sys::Rectangle& rect, std::uint32_t color)
@@ -621,7 +627,10 @@ void SwVideo::n3ds_present_playing()
 		n3ds_mask_copy_[i] = vid_mask_buffer_[i] ? 1 : 0;
 	}
 
-	n3ds_colors_copy_ = n3ds_colors_;
+	for (auto i = 0; i < 256; ++i)
+	{
+		n3ds_colors_copy_[i] = n3ds_rgb565(n3ds_colors_[i]);
+	}
 
 	n3ds::core1_start(n3ds_compose_playing, this);
 }
@@ -811,7 +820,7 @@ void SwVideo::n3ds_present()
 
 				for (auto y = 0; y < block; ++y)
 				{
-					*dst-- = *src;
+					*dst-- = n3ds_rgb565(*src);
 					src += n3ds_width;
 				}
 			}
