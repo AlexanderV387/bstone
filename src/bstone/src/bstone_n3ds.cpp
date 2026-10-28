@@ -24,6 +24,8 @@ SPDX-License-Identifier: MIT
 #include "id_in.h"
 #include "bstone_cvar.h"
 #include "bstone_cvar_mgr.h"
+#include "bstone_globals.h"
+#include "bstone_logger.h"
 #include "bstone_n3ds_keyboard.h"
 #include "bstone_n3ds_weapons.h"
 
@@ -664,20 +666,6 @@ void count_frame(int present_us)
 		return;
 	}
 
-	if (!is_fps_shown())
-	{
-		frame_count_ = 0;
-		present_us_total_ = 0;
-
-		for (auto& total : profile_us_totals_)
-		{
-			total = 0;
-		}
-
-		fps_time_ = now;
-		return;
-	}
-
 	fps_ = static_cast<int>((frame_count_ * 1000) / elapsed);
 	frame_ms_ = static_cast<int>(elapsed / frame_count_);
 	present_ms_ = static_cast<int>(present_us_total_ / frame_count_ / 1000);
@@ -691,6 +679,22 @@ void count_frame(int present_us)
 	frame_count_ = 0;
 	present_us_total_ = 0;
 	fps_time_ = now;
+
+	// In the log every 5 seconds, playing or not: the frame rate and what
+	// each part of a frame takes.
+	static int seconds = 0;
+
+	if (++seconds >= 5)
+	{
+		seconds = 0;
+		bstone::globals::logger->log_information((
+			std::string{"[3DS] perf: "} + std::to_string(fps_) + " FPS, " +
+			std::to_string(frame_ms_) + " ms a frame (screen image " + std::to_string(present_ms_) +
+			", walls " + std::to_string(profile_ms_[profile_walls]) +
+			", floors and ceilings " + std::to_string(profile_ms_[profile_planes]) +
+			", sprites " + std::to_string(profile_ms_[profile_sprites]) + " ms), " +
+			std::to_string(400 * top_columns()) + "x240" + (is_game_mode() ? ", playing" : "")).c_str());
+	}
 }
 
 std::uint32_t* get_bottom_buffer() noexcept
