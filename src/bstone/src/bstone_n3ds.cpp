@@ -24,8 +24,6 @@ SPDX-License-Identifier: MIT
 #include "id_in.h"
 #include "bstone_cvar.h"
 #include "bstone_cvar_mgr.h"
-#include "bstone_globals.h"
-#include "bstone_logger.h"
 #include "bstone_n3ds_keyboard.h"
 #include "bstone_n3ds_weapons.h"
 
@@ -575,11 +573,6 @@ void worker_main(void* arg)
 
 } // namespace
 
-int presenting_core() noexcept
-{
-	return worker_core_;
-}
-
 void core1_start(void (*job)(void*), void* data)
 {
 	if (!workers_tried_)
@@ -808,15 +801,6 @@ void present_bottom(bool is_hud)
 		fill_bottom(bottom_buffer_, 256, y, 62, 13, 0x000000FFU);
 		draw_number(bottom_buffer_, fps_, 259, y + 2, 2, 0xFFFFFFFFU);
 		draw_number(bottom_buffer_, frame_ms_, 289, y + 2, 2, 0x80FF80FFU);
-
-		// Below, the milliseconds of each part of a frame: the screen's
-		// image (yellow), walls (cyan), floors and ceilings (magenta),
-		// sprites (orange).
-		fill_bottom(bottom_buffer_, 196, y + 13, 122, 13, 0x000000FFU);
-		draw_number(bottom_buffer_, present_ms_, 199, y + 15, 2, 0xFFFF40FFU);
-		draw_number(bottom_buffer_, profile_ms_[profile_walls], 229, y + 15, 2, 0x40FFFFFFU);
-		draw_number(bottom_buffer_, profile_ms_[profile_planes], 259, y + 15, 2, 0xFF60FFFFU);
-		draw_number(bottom_buffer_, profile_ms_[profile_sprites], 289, y + 15, 2, 0xFFA040FFU);
 	}
 
 	// The HUD keeps the bottom screen on.
