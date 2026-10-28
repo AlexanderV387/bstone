@@ -75,6 +75,12 @@ std::uint32_t* get_top_framebuffer();
 // software renderer on the 3DS ignores vsync).
 void present_top_framebuffer();
 
+// A job on the other core (core 1), one at a time: core1_start returns at
+// once (or runs it here if that core cannot be had); core1_wait waits for
+// the last one to end.
+void core1_start(void (*job)(void*), void* data);
+void core1_wait();
+
 void wait_for_vblank();
 
 std::uint64_t get_milliseconds();
@@ -87,6 +93,7 @@ enum ProfileSlot
 	profile_walls,
 	profile_planes, // floors and ceilings
 	profile_sprites,
+	profile_core1, // the top screen's image, on the other core
 	profile_slot_count,
 };
 

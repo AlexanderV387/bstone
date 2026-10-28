@@ -414,6 +414,8 @@ const char* choose_game()
 
 void on_quit()
 {
+	core1_wait(); // the other core done with the top screen
+
 	// Quit in the installed .cia goes back to the game picker: relaunch this
 	// title when it exits. Not when closed from the HOME Menu, nor as a
 	// .3dsx (relaunching would restart the Homebrew Launcher).
@@ -536,6 +538,69 @@ void present_top_framebuffer()
 	GSPGPU_FlushDataCache(get_top_framebuffer(), 400 * top_columns() * 240 * 4);
 	gfxScreenSwapBuffers(GFX_TOP, false);
 	gspWaitForVBlank();
+}
+
+namespace {
+
+Thread core1_thread_ = nullptr;
+LightEvent core1_go_;
+LightEvent core1_done_;
+void (*core1_job_)(void*) = nullptr;
+void* core1_data_ = nullptr;
+bool core1_busy_ = false;
+bool core1_tried_ = false;
+
+void core1_main(void*)
+{
+	for (;;)
+	{
+		LightEvent_Wait(&core1_go_);
+
+		if (core1_job_ == nullptr)
+		{
+			break; // (never: the thread lives as long as the game)
+		}
+
+		core1_job_(core1_data_);
+		LightEvent_Signal(&core1_done_);
+	}
+}
+
+} // namespace
+
+void core1_start(void (*job)(void*), void* data)
+{
+	if (!core1_tried_)
+	{
+		core1_tried_ = true;
+		LightEvent_Init(&core1_go_, RESET_ONESHOT);
+		LightEvent_Init(&core1_done_, RESET_ONESHOT);
+
+		if (R_SUCCEEDED(APT_SetAppCpuTimeLimit(80)) || R_SUCCEEDED(APT_SetAppCpuTimeLimit(30)))
+		{
+			core1_thread_ = threadCreate(core1_main, nullptr, 64 * 1024, 0x18, 1, true);
+		}
+	}
+
+	if (core1_thread_ == nullptr || is_closing())
+	{
+		job(data);
+		return;
+	}
+
+	core1_job_ = job;
+	core1_data_ = data;
+	core1_busy_ = true;
+	LightEvent_Signal(&core1_go_);
+}
+
+void core1_wait()
+{
+	if (core1_busy_)
+	{
+		LightEvent_Wait(&core1_done_);
+		core1_busy_ = false;
+	}
 }
 
 void wait_for_vblank()
@@ -692,7 +757,8 @@ void count_frame(int present_us)
 			std::to_string(frame_ms_) + " ms a frame (screen image " + std::to_string(present_ms_) +
 			", walls " + std::to_string(profile_ms_[profile_walls]) +
 			", floors and ceilings " + std::to_string(profile_ms_[profile_planes]) +
-			", sprites " + std::to_string(profile_ms_[profile_sprites]) + " ms), " +
+			", sprites " + std::to_string(profile_ms_[profile_sprites]) +
+			"; on core 1: " + std::to_string(profile_ms_[profile_core1]) + " ms), " +
 			std::to_string(400 * top_columns()) + "x240" + (is_game_mode() ? ", playing" : "")).c_str());
 	}
 }

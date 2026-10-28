@@ -145,8 +145,21 @@ private:
 	std::vector<std::uint32_t> n3ds_frame_{};
 	std::array<std::uint32_t, 256> n3ds_colors_{};
 
+	// The playing frame's layers, copied for the other core to compose
+	// while this one goes on with the next frame.
+	std::vector<std::uint8_t> n3ds_view_copy_{};
+	std::vector<std::uint8_t> n3ds_ui_copy_{};
+	std::vector<std::uint8_t> n3ds_mask_copy_{};
+	std::array<std::uint32_t, 256> n3ds_colors_copy_{};
+	std::vector<int> n3ds_view_xs_{};
+	std::vector<int> n3ds_ui_xs_{};
+	std::array<int, 240> n3ds_view_ys_{};
+	std::array<int, 240> n3ds_ui_ys_{};
+	int n3ds_compose_width_{};
+
 	void n3ds_present();
 	void n3ds_present_playing();
+	static void n3ds_compose_playing(void* sw_video);
 	void n3ds_fill(const sys::Rectangle& rect, std::uint32_t color);
 	void n3ds_blit(
 		const std::uint8_t* src,
@@ -551,7 +564,8 @@ void SwVideo::n3ds_blit(
 }
 
 // The 3D view scaled to the whole top screen, the UI over it where its mask
-// says, written rotated into the framebuffer in 8x8 blocks.
+// says: the layers copied, composed and shown on the other core (rotated
+// into the framebuffer in 8x8 blocks), while this one goes on.
 void SwVideo::n3ds_present_playing()
 {
 	const auto columns = n3ds_columns();
@@ -571,35 +585,60 @@ void SwVideo::n3ds_present_playing()
 			(ref_3d_view_height * middle_rect.height) / ref_view_height,
 		};
 
-	static int view_xs[n3ds_max_width];
-	static int view_ys[n3ds_height];
-	static int ui_xs[n3ds_max_width];
-	static int ui_ys[n3ds_height];
+	// The other core done with the last frame: its copies are free.
+	n3ds::core1_wait();
+
+	n3ds_compose_width_ = n3ds_width;
+	n3ds_view_xs_.resize(n3ds_width);
+	n3ds_ui_xs_.resize(n3ds_width);
 
 	for (auto x = 0; x < n3ds_width; ++x)
 	{
-		view_xs[x] = (x * vga_width) / n3ds_width;
+		n3ds_view_xs_[x] = (x * vga_width) / n3ds_width;
 
 		const auto ui_x = x - ui_dst.x * columns;
-		ui_xs[x] = (ui_x >= 0 && ui_x < ui_dst.width * columns) ?
+		n3ds_ui_xs_[x] = (ui_x >= 0 && ui_x < ui_dst.width * columns) ?
 			ui_src.x + (ui_x * ui_src.width) / (ui_dst.width * columns) :
 			-1;
 	}
 
 	for (auto y = 0; y < n3ds_height; ++y)
 	{
-		view_ys[y] = ((y * vga_height) / n3ds_height) * vga_width;
+		n3ds_view_ys_[y] = ((y * vga_height) / n3ds_height) * vga_width;
 
 		const auto ui_y = y - ui_dst.y;
-		ui_ys[y] = (ui_y >= 0 && ui_y < ui_dst.height && ui_src.height > 0) ?
+		n3ds_ui_ys_[y] = (ui_y >= 0 && ui_y < ui_dst.height && ui_src.height > 0) ?
 			(ui_src.y + (ui_y * ui_src.height) / ui_dst.height) * vga_ref_width :
 			-1;
 	}
 
-	const auto view = sw_vga_buffer_.data();
-	const auto ui = vid_ui_buffer_.data();
-	const auto mask = vid_mask_buffer_.data();
-	const auto colors = n3ds_colors_.data();
+	n3ds_view_copy_.assign(sw_vga_buffer_.data(), sw_vga_buffer_.data() + vga_width * vga_height);
+	n3ds_ui_copy_.assign(vid_ui_buffer_.data(), vid_ui_buffer_.data() + vid_ui_buffer_.size());
+	n3ds_mask_copy_.resize(vid_mask_buffer_.size());
+
+	for (auto i = std::size_t{}; i < vid_mask_buffer_.size(); ++i)
+	{
+		n3ds_mask_copy_[i] = vid_mask_buffer_[i] ? 1 : 0;
+	}
+
+	n3ds_colors_copy_ = n3ds_colors_;
+
+	n3ds::core1_start(n3ds_compose_playing, this);
+}
+
+void SwVideo::n3ds_compose_playing(void* sw_video)
+{
+	auto& self = *static_cast<SwVideo*>(sw_video);
+	const auto start_us = n3ds::get_microseconds();
+	const auto n3ds_width = self.n3ds_compose_width_;
+	const auto view = self.n3ds_view_copy_.data();
+	const auto ui = self.n3ds_ui_copy_.data();
+	const auto mask = self.n3ds_mask_copy_.data();
+	const auto colors = self.n3ds_colors_copy_.data();
+	const auto view_xs = self.n3ds_view_xs_.data();
+	const auto ui_xs = self.n3ds_ui_xs_.data();
+	const auto view_ys = self.n3ds_view_ys_.data();
+	const auto ui_ys = self.n3ds_ui_ys_.data();
 	const auto framebuffer = n3ds::get_top_framebuffer();
 	constexpr auto block = 8;
 
@@ -621,7 +660,7 @@ void SwVideo::n3ds_present_playing()
 					{
 						const auto k = ui_ys[y] + ui_x;
 
-						if (mask[k])
+						if (mask[k] != 0)
 						{
 							color = ui[k];
 						}
@@ -632,6 +671,9 @@ void SwVideo::n3ds_present_playing()
 			}
 		}
 	}
+
+	n3ds::add_profile_time(n3ds::profile_core1, static_cast<int>(n3ds::get_microseconds() - start_us));
+	n3ds::present_top_framebuffer();
 }
 
 // The same layers and rectangles as present(), without SDL.
@@ -639,6 +681,9 @@ void SwVideo::n3ds_present()
 {
 	const auto start_ms = n3ds::get_microseconds();
 	const auto n3ds_width = 400 * n3ds_columns();
+
+	// (Playing, the other core may still be showing the last frame.)
+	n3ds::core1_wait();
 
 	n3ds_frame_.resize(n3ds_width * n3ds_height);
 
@@ -662,8 +707,7 @@ void SwVideo::n3ds_present()
 		n3ds::draw_bottom_hud(vid_ui_buffer_.data(), n3ds_colors_.data());
 		n3ds::present_bottom(true);
 		n3ds::count_frame(static_cast<int>(n3ds::get_microseconds() - start_ms));
-		n3ds::present_top_framebuffer();
-		return;
+		return; // (the other core shows the top screen)
 	}
 
 	std::fill(n3ds_frame_.begin(), n3ds_frame_.end(), black);
